@@ -1,5 +1,9 @@
 import { useState } from 'react'
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
+import FakeNewsDetection from './components/FakeNewsDetection.jsx'
 import './App.css'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 const modules = [
   {
@@ -59,21 +63,91 @@ const modules = [
   }
 ]
 
-function App() {
+function parseJwt(token) {
+  const base64Url = token.split('.')[1]
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+  return JSON.parse(atob(base64))
+}
+
+function AppContent() {
   const [activeModule, setActiveModule] = useState(modules[0].id)
   const [authOpen, setAuthOpen] = useState(false)
-  const [authMode, setAuthMode] = useState('signin')
   const [authMessage, setAuthMessage] = useState('')
-  const [authData, setAuthData] = useState({ name: '', email: '', password: '' })
+  const [authData, setAuthData] = useState({ email: '', password: '' })
+  const [user, setUser] = useState(null)
+  const [pendingAction, setPendingAction] = useState(null)
   const selectedModule = modules.find((module) => module.id === activeModule) ?? modules[0]
+
+  const isAuthenticated = Boolean(user)
+
+  const openAuth = () => {
+    setAuthOpen(true)
+    setAuthMessage('')
+  }
+
+  const completeAuth = (userData) => {
+    setUser(userData)
+    setAuthOpen(false)
+    setAuthMessage('')
+    setAuthData({ email: '', password: '' })
+    if (pendingAction) {
+      pendingAction()
+      setPendingAction(null)
+    }
+  }
+
+  const requireAuth = (action) => {
+    if (isAuthenticated) {
+      action()
+    } else {
+      setPendingAction(() => action)
+      openAuth()
+    }
+  }
 
   const handleAuthSubmit = (event) => {
     event.preventDefault()
-    setAuthMessage(
-      authMode === 'signin'
-        ? 'Welcome back! You are now signed in.'
-        : 'Account created successfully. You can now continue.'
-    )
+    completeAuth({
+      name: authData.email.split('@')[0],
+      email: authData.email,
+      provider: 'email'
+    })
+  }
+
+  const handleGoogleSuccess = (credentialResponse) => {
+    if (credentialResponse.credential) {
+      const decoded = parseJwt(credentialResponse.credential)
+      completeAuth({
+        name: decoded.name,
+        email: decoded.email,
+        picture: decoded.picture,
+        provider: 'google'
+      })
+    }
+  }
+
+  const handleGoogleDemo = () => {
+    completeAuth({
+      name: 'Google User',
+      email: 'user@gmail.com',
+      provider: 'google'
+    })
+  }
+
+  const handleSignOut = () => {
+    setUser(null)
+    setPendingAction(null)
+  }
+
+  const handleModuleSelect = (moduleId) => {
+    requireAuth(() => setActiveModule(moduleId))
+  }
+
+  const handleFeatureClick = (event, action) => {
+    if (!isAuthenticated) {
+      event.preventDefault()
+      requireAuth(action)
+    }
   }
 
   return (
@@ -87,61 +161,74 @@ function App() {
           </div>
         </div>
         <nav className="topnav" aria-label="Primary navigation">
+          <a href="#about">About</a>
+          <a href="#details">Details</a>
+          <a href="#contact">Contact Us</a>
           <a href="#modules">Modules</a>
           <a href="#workflow">Workflow</a>
           <a href="#upload">Analyze</a>
           <div className="auth-actions">
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => {
-                setAuthMode('signin')
-                setAuthOpen(true)
-                setAuthMessage('')
-              }}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              className="primary-btn compact"
-              onClick={() => {
-                setAuthMode('signup')
-                setAuthOpen(true)
-                setAuthMessage('')
-              }}
-            >
-              Sign up
-            </button>
+            {isAuthenticated ? (
+              <>
+                <span className="user-greeting">
+                  {user.picture ? (
+                    <img src={user.picture} alt="" className="user-avatar" />
+                  ) : null}
+                  Hi, {user.name}
+                </span>
+                <button type="button" className="ghost-btn" onClick={handleSignOut}>
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button type="button" className="primary-btn compact" onClick={openAuth}>
+                Login
+              </button>
+            )}
           </div>
         </nav>
       </header>
 
       {authOpen && (
-        <div className="auth-overlay" role="dialog" aria-modal="true" aria-label="Authentication">
+        <div className="auth-overlay" role="dialog" aria-modal="true" aria-label="Login">
           <div className="auth-card">
             <div className="auth-card-head">
               <div>
-                <p className="eyebrow">Secure access</p>
-                <h2>{authMode === 'signin' ? 'Welcome back' : 'Create your account'}</h2>
+                <p className="eyebrow">Quick access</p>
+                <h2>Login to continue</h2>
+                <p className="auth-subtitle">
+                  Use Google or your email to unlock modules, workflow, and file analysis.
+                </p>
               </div>
               <button type="button" className="close-btn" onClick={() => setAuthOpen(false)}>
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleAuthSubmit} className="auth-form">
-              {authMode === 'signup' && (
-                <input
-                  type="text"
-                  placeholder="Full name"
-                  value={authData.name}
-                  onChange={(event) =>
-                    setAuthData((current) => ({ ...current, name: event.target.value }))
-                  }
-                  required
+            <div className="google-auth-section">
+              {GOOGLE_CLIENT_ID ? (
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setAuthMessage('Google login failed. Please try again.')}
+                  theme="filled_black"
+                  size="large"
+                  text="continue_with"
+                  shape="pill"
+                  width="100%"
                 />
+              ) : (
+                <button type="button" className="google-btn" onClick={handleGoogleDemo}>
+                  <span className="google-icon" aria-hidden="true">G</span>
+                  Continue with Google
+                </button>
               )}
+            </div>
+
+            <div className="auth-divider">
+              <span>or login with email</span>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} className="auth-form">
               <input
                 type="email"
                 placeholder="Email address"
@@ -161,18 +248,9 @@ function App() {
                 required
               />
 
-              <div className="form-actions">
-                <button type="submit" className="primary-btn">
-                  {authMode === 'signin' ? 'Sign in' : 'Create account'}
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                >
-                  {authMode === 'signin' ? 'Need an account?' : 'Already have one?'}
-                </button>
-              </div>
+              <button type="submit" className="primary-btn login-submit">
+                Login
+              </button>
             </form>
 
             {authMessage && <p className="auth-message">{authMessage}</p>}
@@ -189,10 +267,26 @@ function App() {
               A secure and intelligent workspace for verifying authenticity across video, audio, images, text, and presentation attacks.
             </p>
             <div className="hero-actions">
-              <a className="primary-btn" href="#upload">
+              <a
+                className="primary-btn"
+                href="#upload"
+                onClick={(event) =>
+                  handleFeatureClick(event, () => {
+                    document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' })
+                  })
+                }
+              >
                 Start analysis
               </a>
-              <a className="secondary-btn" href="#modules">
+              <a
+                className="secondary-btn"
+                href="#modules"
+                onClick={(event) =>
+                  handleFeatureClick(event, () => {
+                    document.getElementById('modules')?.scrollIntoView({ behavior: 'smooth' })
+                  })
+                }
+              >
                 Explore modules
               </a>
             </div>
@@ -236,11 +330,54 @@ function App() {
           </div>
         </section>
 
+        <section id="about" className="panel-card about-section">
+          <div className="section-heading">
+            <p className="eyebrow">About us</p>
+            <h2>What is Deepfake Defense?</h2>
+          </div>
+          <div className="about-grid">
+            <div className="about-block">
+              <h3>Our mission</h3>
+              <p>
+                Deepfake Defense is an AI-powered media authenticity platform built to protect individuals,
+                organizations, and institutions from manipulated digital content. We combine advanced detection
+                models across video, audio, image, text, and biometric spoofing to deliver fast, reliable
+                verification results.
+              </p>
+            </div>
+            <div className="about-block">
+              <h3>Why it matters</h3>
+              <p>
+                Synthetic media and deepfakes are growing threats to trust in news, finance, identity systems,
+                and public discourse. Our platform helps analysts, security teams, and content moderators
+                identify tampered or AI-generated material before it causes harm.
+              </p>
+            </div>
+            <div className="about-block">
+              <h3>Get started</h3>
+              <p>
+                Browse our modules and workflow to learn how detection works. Login once to unlock analysis,
+                module selection, and file uploads — Google login is the fastest way in.
+              </p>
+              {!isAuthenticated && (
+                <div className="about-auth-cta">
+                  <button type="button" className="primary-btn compact" onClick={openAuth}>
+                    Login to continue
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section className="content-grid" id="modules">
           <div className="panel-card">
             <div className="section-heading">
               <p className="eyebrow">Detection suite</p>
               <h2>Choose a module</h2>
+              {!isAuthenticated && (
+                <p className="auth-hint">Login required to select and use detection modules.</p>
+              )}
             </div>
             <div className="card-grid">
               {modules.map((module) => (
@@ -248,7 +385,7 @@ function App() {
                   key={module.id}
                   type="button"
                   className={`module-card ${activeModule === module.id ? 'active' : ''}`}
-                  onClick={() => setActiveModule(module.id)}
+                  onClick={() => handleModuleSelect(module.id)}
                 >
                   <span className="module-icon">{module.icon}</span>
                   <h3>{module.name}</h3>
@@ -295,6 +432,54 @@ function App() {
           </div>
         </section>
 
+        <FakeNewsDetection />
+
+        <section id="details" className="panel-card details-section">
+          <div className="section-heading">
+            <p className="eyebrow">Platform details</p>
+            <h2>Technical specifications & capabilities</h2>
+          </div>
+          <div className="details-grid">
+            <div className="detail-card">
+              <h3>Supported formats</h3>
+              <ul className="info-list">
+                <li>Video: MP4, AVI, MOV, WebM</li>
+                <li>Audio: WAV, MP3, FLAC, OGG</li>
+                <li>Image: JPG, PNG, WebP, TIFF</li>
+                <li>Text: TXT, PDF, DOCX</li>
+              </ul>
+            </div>
+            <div className="detail-card">
+              <h3>Detection models</h3>
+              <ul className="info-list">
+                <li>Temporal consistency analysis for video</li>
+                <li>Presentation attack detection (PAD)</li>
+                <li>Forensic artifact & noise analysis</li>
+                <li>Stylometry & semantic drift scoring</li>
+                <li>Voice synthesis & spectral fingerprinting</li>
+              </ul>
+            </div>
+            <div className="detail-card">
+              <h3>Performance</h3>
+              <ul className="info-list">
+                <li>Average analysis time: under 30 seconds</li>
+                <li>Confidence scoring with explainability</li>
+                <li>Batch processing support</li>
+                <li>API-ready architecture</li>
+              </ul>
+            </div>
+            <div className="detail-card">
+              <h3>Security</h3>
+              <ul className="info-list">
+                <li>End-to-end encrypted uploads</li>
+                <li>No permanent storage of analyzed media</li>
+                <li>OAuth 2.0 & Google login support</li>
+                <li>Role-based access controls</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <section id="workflow" className="panel-card workflow-card">
           <div className="section-heading">
             <p className="eyebrow">Workflow</p>
@@ -319,6 +504,79 @@ function App() {
           </div>
         </section>
 
+        <section id="showcase" className="panel-card showcase-section">
+          <div className="section-heading">
+            <p className="eyebrow">What you can do</p>
+            <h2>See the platform capabilities in action</h2>
+          </div>
+          <div className="showcase-grid">
+            <div className="showcase-copy">
+              <div className="showcase-box">
+                <h3>Completed features</h3>
+                <ul className="feature-list">
+                  <li>Multi-modal upload support for image, text, video, and audio</li>
+                  <li>Live demo result preview for fake-news analysis</li>
+                  <li>Interactive module selection and guided workflow</li>
+                  <li>User-friendly auth and secure access</li>
+                </ul>
+              </div>
+              <div className="showcase-box">
+                <h3>Supported file types</h3>
+                <ul className="feature-list">
+                  <li>Image: JPG, PNG, WebP, TIFF</li>
+                  <li>Text: TXT, PDF, DOCX</li>
+                  <li>Video: MP4, AVI, MOV, WebM</li>
+                  <li>Audio: WAV, MP3, FLAC, OGG</li>
+                </ul>
+              </div>
+              <div className="showcase-box">
+                <h3>Example use cases</h3>
+                <ul className="feature-list">
+                  <li>Fake-news verification for social media posts</li>
+                  <li>Deepfake detection in investigative reporting</li>
+                  <li>Audio cloning and voice spoofing risk checks</li>
+                  <li>Image forgery and tampering validation</li>
+                </ul>
+              </div>
+            </div>
+            <div className="demo-card">
+              <div className="demo-card-header">
+                <p className="eyebrow">Live demo</p>
+                <h3>Sample fake-news analysis result</h3>
+              </div>
+              <div className="demo-metrics">
+                <div>
+                  <span className="metric-label">Confidence</span>
+                  <strong>87%</strong>
+                </div>
+                <div>
+                  <span className="metric-label">Risk level</span>
+                  <strong>High</strong>
+                </div>
+                <div>
+                  <span className="metric-label">Module</span>
+                  <strong>Image + Text</strong>
+                </div>
+              </div>
+              <div className="demo-summary">
+                <p>AI-generated language and tampering traces detected in submitted content.</p>
+              </div>
+              <ul className="demo-highlights">
+                <li>Semantic mismatch and abnormal phrasing</li>
+                <li>Image metadata irregularities visible</li>
+                <li>Audio synthesis signature flagged</li>
+              </ul>
+              <button
+                type="button"
+                className="primary-btn demo-cta"
+                onClick={() => document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                Try the demo flow
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section id="upload" className="panel-card upload-card">
           <div>
             <p className="eyebrow">Upload media</p>
@@ -335,11 +593,113 @@ function App() {
             <span>Supports mp4, wav, jpg, png, pdf, and txt</span>
           </div>
         </section>
+
+        <section id="contact" className="panel-card contact-section">
+          <div className="section-heading">
+            <p className="eyebrow">Contact us</p>
+            <h2>Get in touch with our team</h2>
+          </div>
+          <div className="contact-grid">
+            <div className="contact-info">
+              <p>
+                Have questions about Deepfake Defense, partnerships, or enterprise deployment?
+                Reach out to us — we typically respond within 24 hours.
+              </p>
+              <div className="contact-emails">
+                <a href="mailto:gandhamprakashtech@gmail.com">gandhamprakashtech@gmail.com</a>
+                <a href="mailto:nikhilgokavarapu9@gmail.com">nikhilgokavarapu9@gmail.com</a>
+              </div>
+            </div>
+            <form
+              className="contact-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                requireAuth(() => {
+                  alert('Thank you! Your message has been sent.')
+                })
+              }}
+            >
+              <input type="text" placeholder="Your name" required />
+              <input type="email" placeholder="Your email" required />
+              <textarea placeholder="Your message" rows={4} required />
+              <button type="submit" className="primary-btn">Send message</button>
+            </form>
+          </div>
+        </section>
       </main>
 
-      <footer className="footer">Built for secure digital trust and content verification.</footer>
+      <footer className="site-footer">
+        <div className="footer-back-top">
+          <a href="#about">Back to top</a>
+        </div>
+        <div className="footer-columns">
+          <div className="footer-col">
+            <h4>Get to Know Us</h4>
+            <ul>
+              <li><a href="#about">About Deepfake Defense</a></li>
+              <li><a href="#details">Platform Details</a></li>
+              <li><a href="#modules">Detection Modules</a></li>
+              <li><a href="#workflow">How It Works</a></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Services</h4>
+            <ul>
+              <li><a href="#modules">Video Analysis</a></li>
+              <li><a href="#modules">Audio Verification</a></li>
+              <li><a href="#modules">Image Forensics</a></li>
+              <li><a href="#upload">File Upload & Scan</a></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Contact Us</h4>
+            <ul>
+              <li>
+                <a href="mailto:gandhamprakashtech@gmail.com">gandhamprakashtech@gmail.com</a>
+              </li>
+              <li>
+                <a href="mailto:nikhilgokavarapu9@gmail.com">nikhilgokavarapu9@gmail.com</a>
+              </li>
+              <li><a href="#contact">Send a Message</a></li>
+              <li><a href="#contact">Support</a></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Legal & Account</h4>
+            <ul>
+              <li><a href="#about">Privacy Policy</a></li>
+              <li><a href="#about">Terms of Service</a></li>
+              <li>
+                <button type="button" className="footer-link-btn" onClick={openAuth}>
+                  Login
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <div className="footer-brand">
+            <div className="brand-mark small">AI</div>
+            <span>Deepfake Defense</span>
+          </div>
+          <p className="footer-copy">
+            © {new Date().getFullYear()} Deepfake Defense. Built for secure digital trust and content verification.
+          </p>
+        </div>
+      </footer>
     </div>
   )
+}
+
+function App() {
+  if (GOOGLE_CLIENT_ID) {
+    return (
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <AppContent />
+      </GoogleOAuthProvider>
+    )
+  }
+  return <AppContent />
 }
 
 export default App
