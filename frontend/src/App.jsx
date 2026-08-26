@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
-import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
 import FakeNewsDetection from './components/FakeNewsDetection.jsx'
+import { supabase } from './lib/supabase.js'
 import './App.css'
-
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 const modules = [
   {
@@ -63,19 +61,16 @@ const modules = [
   }
 ]
 
-function parseJwt(token) {
-  const base64Url = token.split('.')[1]
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-  return JSON.parse(atob(base64))
-}
-
 function AppContent() {
   const [activeModule, setActiveModule] = useState(modules[0].id)
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState('login')
   const [authMessage, setAuthMessage] = useState('')
   const [authData, setAuthData] = useState({ email: '', password: '' })
+  const [showPassword, setShowPassword] = useState(false)
   const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const selectedModule = modules.find((module) => module.id === activeModule) ?? modules[0]
 
   const isAuthenticated = Boolean(user)
@@ -87,49 +82,65 @@ function AppContent() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false)
+      return undefined
+    }
+
+    let mounted = true
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) {
+        setUser(session?.user ?? null)
+        setAuthLoading(false)
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setAuthLoading(false)
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
   const openAuth = () => {
     setAuthOpen(true)
+    setAuthMode('login')
     setAuthMessage('')
-  }
-
-  const completeAuth = (userData) => {
-    setUser(userData)
-    setAuthOpen(false)
-    setAuthMessage('')
-    setAuthData({ email: '', password: '' })
   }
 
   const handleAuthSubmit = (event) => {
     event.preventDefault()
-    completeAuth({
-      name: authData.email.split('@')[0],
-      email: authData.email,
-      provider: 'email'
-    })
-  }
-
-  const handleGoogleSuccess = (credentialResponse) => {
-    if (credentialResponse.credential) {
-      const decoded = parseJwt(credentialResponse.credential)
-      completeAuth({
-        name: decoded.name,
-        email: decoded.email,
-        picture: decoded.picture,
-        provider: 'google'
-      })
+    if (!supabase) {
+      setAuthMessage('Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your .env file.')
+      return
     }
-  }
 
-  const handleGoogleDemo = () => {
-    completeAuth({
-      name: 'Google User',
-      email: 'user@gmail.com',
-      provider: 'google'
+    setAuthMessage('')
+    const authAction = authMode === 'signup'
+      ? supabase.auth.signUp({ email: authData.email, password: authData.password })
+      : supabase.auth.signInWithPassword({ email: authData.email, password: authData.password })
+
+    authAction.then(({ data, error }) => {
+      if (error) {
+        setAuthMessage(error.message)
+        return
+      }
+      if (authMode === 'signup' && !data.session) {
+        setAuthMessage('Check your email to confirm your account, then log in.')
+        return
+      }
+      setAuthOpen(false)
+      setAuthData({ email: '', password: '' })
     })
   }
 
-  const handleSignOut = () => {
-    setUser(null)
+  const handleSignOut = async () => {
+    await supabase?.auth.signOut()
   }
 
   const handleModuleSelect = (moduleId) => {
@@ -159,10 +170,7 @@ function AppContent() {
             {isAuthenticated ? (
               <>
                 <span className="user-greeting">
-                  {user.picture ? (
-                    <img src={user.picture} alt="" className="user-avatar" />
-                  ) : null}
-                  Hi, {user.name}
+                  Hi, {user.email?.split('@')[0]}
                 </span>
                 <button type="button" className="ghost-btn" onClick={handleSignOut}>
                   Sign out
@@ -185,7 +193,7 @@ function AppContent() {
                 <p className="eyebrow">Quick access</p>
                 <h2>Login to continue</h2>
                 <p className="auth-subtitle">
-                  Use Google or your email to unlock modules, workflow, and file analysis.
+                  Use your email to unlock modules, workflow, and file analysis.
                 </p>
               </div>
               <button type="button" className="close-btn" onClick={() => setAuthOpen(false)}>
@@ -193,32 +201,8 @@ function AppContent() {
               </button>
             </div>
 
-            <div className="google-auth-section">
-              {GOOGLE_CLIENT_ID ? (
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setAuthMessage('Google login failed. Please try again.')}
-                  theme="filled_black"
-                  size="large"
-                  text="continue_with"
-                  shape="pill"
-                  width="100%"
-                />
-              ) : (
-                <button type="button" className="google-btn" onClick={handleGoogleDemo}>
-                  <svg className="google-icon" aria-hidden="true" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M21.35 12.27c0-.78-.07-1.54-.23-2.27H12v4.3h5.23a4.47 4.47 0 0 1-1.94 2.93v2.48h3.18c1.86-1.71 2.88-4.24 2.88-7.44Z" />
-                    <path fill="#34A853" d="M12 21.5c2.66 0 4.9-.88 6.53-2.39l-3.18-2.48c-.88.6-2 .96-3.35.96-2.57 0-4.75-1.74-5.53-4.08H3.19v2.56A9.86 9.86 0 0 0 12 21.5Z" />
-                    <path fill="#FBBC05" d="M6.47 13.51A5.93 5.93 0 0 1 6.16 12c0-.52.11-1.03.31-1.51V7.93H3.19A9.5 9.5 0 0 0 2.5 12c0 1.47.35 2.86.69 4.07l3.28-2.56Z" />
-                    <path fill="#EA4335" d="M12 6.41c1.45 0 2.75.5 3.77 1.48l2.82-2.82C16.9 3.46 14.66 2.5 12 2.5a9.86 9.86 0 0 0-8.81 5.43l3.28 2.56C7.25 8.15 9.43 6.41 12 6.41Z" />
-                  </svg>
-                  Continue with Google
-                </button>
-              )}
-            </div>
-
             <div className="auth-divider">
-              <span>or login with email</span>
+              <span>{authMode === 'signup' ? 'Create your account' : 'Login with email'}</span>
             </div>
 
             <form onSubmit={handleAuthSubmit} className="auth-form">
@@ -231,20 +215,41 @@ function AppContent() {
                 }
                 required
               />
-              <input
-                type="password"
-                placeholder="Password"
-                value={authData.password}
-                onChange={(event) =>
-                  setAuthData((current) => ({ ...current, password: event.target.value }))
-                }
-                required
-              />
+              <div className="password-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password"
+                  value={authData.password}
+                  onChange={(event) =>
+                    setAuthData((current) => ({ ...current, password: event.target.value }))
+                  }
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
 
-              <button type="submit" className="primary-btn login-submit">
-                Login
+              <button type="submit" className="primary-btn login-submit" disabled={authLoading}>
+                {authMode === 'signup' ? 'Create account' : 'Login'}
               </button>
             </form>
+
+            <button
+              type="button"
+              className="footer-link-btn auth-switch"
+              onClick={() => {
+                setAuthMode((mode) => mode === 'login' ? 'signup' : 'login')
+                setAuthMessage('')
+              }}
+            >
+              {authMode === 'signup' ? 'Already have an account? Login' : 'Need an account? Sign up'}
+            </button>
 
             {authMessage && <p className="auth-message">{authMessage}</p>}
           </div>
@@ -409,7 +414,7 @@ function AppContent() {
           </div>
         </section>
 
-        <FakeNewsDetection />
+        <FakeNewsDetection user={user} onLogin={openAuth} />
 
         <section id="details" className="panel-card details-section">
           <div className="section-heading">
@@ -450,7 +455,7 @@ function AppContent() {
               <ul className="info-list">
                 <li>End-to-end encrypted uploads</li>
                 <li>No permanent storage of analyzed media</li>
-                <li>OAuth 2.0 & Google login support</li>
+                <li>Secure email authentication</li>
                 <li>Role-based access controls</li>
               </ul>
             </div>
@@ -670,13 +675,6 @@ function AppContent() {
 }
 
 function App() {
-  if (GOOGLE_CLIENT_ID) {
-    return (
-      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        <AppContent />
-      </GoogleOAuthProvider>
-    )
-  }
   return <AppContent />
 }
 

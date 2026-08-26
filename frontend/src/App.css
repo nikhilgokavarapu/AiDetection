@@ -134,6 +134,27 @@
   color: #8ea1c4;
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 64px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #8fe0ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .login-submit {
   width: 100%;
   margin-top: 4px;
@@ -144,6 +165,12 @@
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(107, 212, 255, 0.12);
+  color: #8fe0ff;
+}
+
+.auth-switch {
+  display: block;
+  margin: 14px auto 0;
   color: #8fe0ff;
 }
 
@@ -772,41 +799,6 @@
   line-height: 1.4;
 }
 
-.google-auth-section {
-  margin-bottom: 4px;
-}
-
-.google-auth-section > div {
-  width: 100%;
-}
-
-.google-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: #fff;
-  color: #1f2937;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.google-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
-}
-
-.google-icon {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-}
-
 .auth-divider {
   display: flex;
   align-items: center;
@@ -844,6 +836,52 @@
   margin: 8px 0 0;
   color: #f0b429;
   font-size: 0.88rem;
+}
+
+.save-report-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.save-message {
+  color: #9eb0cd;
+  font-size: 0.85rem;
+}
+
+.saved-reports {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.saved-reports p {
+  color: #9eb0cd;
+}
+
+.saved-report-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saved-report-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #dfe7ff;
+}
+
+.saved-report-list span {
+  color: #9eb0cd;
+  font-size: 0.85rem;
+  text-transform: capitalize;
 }
 
 .lock-badge {
