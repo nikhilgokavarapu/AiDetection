@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
 import FakeNewsDetection from './components/FakeNewsDetection.jsx'
 import './App.css'
@@ -71,14 +71,21 @@ function parseJwt(token) {
 
 function AppContent() {
   const [activeModule, setActiveModule] = useState(modules[0].id)
+  const [showBackToTop, setShowBackToTop] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [authMessage, setAuthMessage] = useState('')
   const [authData, setAuthData] = useState({ email: '', password: '' })
   const [user, setUser] = useState(null)
-  const [pendingAction, setPendingAction] = useState(null)
   const selectedModule = modules.find((module) => module.id === activeModule) ?? modules[0]
 
   const isAuthenticated = Boolean(user)
+
+  useEffect(() => {
+    const handleScroll = () => setShowBackToTop(window.scrollY > 500)
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const openAuth = () => {
     setAuthOpen(true)
@@ -90,19 +97,6 @@ function AppContent() {
     setAuthOpen(false)
     setAuthMessage('')
     setAuthData({ email: '', password: '' })
-    if (pendingAction) {
-      pendingAction()
-      setPendingAction(null)
-    }
-  }
-
-  const requireAuth = (action) => {
-    if (isAuthenticated) {
-      action()
-    } else {
-      setPendingAction(() => action)
-      openAuth()
-    }
   }
 
   const handleAuthSubmit = (event) => {
@@ -136,22 +130,14 @@ function AppContent() {
 
   const handleSignOut = () => {
     setUser(null)
-    setPendingAction(null)
   }
 
   const handleModuleSelect = (moduleId) => {
-    requireAuth(() => setActiveModule(moduleId))
-  }
-
-  const handleFeatureClick = (event, action) => {
-    if (!isAuthenticated) {
-      event.preventDefault()
-      requireAuth(action)
-    }
+    setActiveModule(moduleId)
   }
 
   return (
-    <div className="app-shell">
+    <div id="top" className="app-shell">
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">AI</div>
@@ -161,12 +147,14 @@ function AppContent() {
           </div>
         </div>
         <nav className="topnav" aria-label="Primary navigation">
+          <a href="#top">Home</a>
           <a href="#about">About</a>
-          <a href="#details">Details</a>
-          <a href="#contact">Contact Us</a>
           <a href="#modules">Modules</a>
+          <a href="#fake-news-module">Analyzer</a>
+          <a href="#showcase">Capabilities</a>
+          <a href="#details">Details</a>
           <a href="#workflow">Workflow</a>
-          <a href="#upload">Analyze</a>
+          <a href="#contact">Contact</a>
           <div className="auth-actions">
             {isAuthenticated ? (
               <>
@@ -267,26 +255,10 @@ function AppContent() {
               A secure and intelligent workspace for verifying authenticity across video, audio, images, text, and presentation attacks.
             </p>
             <div className="hero-actions">
-              <a
-                className="primary-btn"
-                href="#upload"
-                onClick={(event) =>
-                  handleFeatureClick(event, () => {
-                    document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' })
-                  })
-                }
-              >
+              <a className="primary-btn" href="#upload">
                 Start analysis
               </a>
-              <a
-                className="secondary-btn"
-                href="#modules"
-                onClick={(event) =>
-                  handleFeatureClick(event, () => {
-                    document.getElementById('modules')?.scrollIntoView({ behavior: 'smooth' })
-                  })
-                }
-              >
+              <a className="secondary-btn" href="#modules">
                 Explore modules
               </a>
             </div>
@@ -356,13 +328,13 @@ function AppContent() {
             <div className="about-block">
               <h3>Get started</h3>
               <p>
-                Browse our modules and workflow to learn how detection works. Login once to unlock analysis,
-                module selection, and file uploads — Google login is the fastest way in.
+                Browse our modules and workflow to learn how detection works. You can analyze content and
+                switch modules without an account; login is optional if you want a personalized session.
               </p>
               {!isAuthenticated && (
                 <div className="about-auth-cta">
                   <button type="button" className="primary-btn compact" onClick={openAuth}>
-                    Login to continue
+                    Login (optional)
                   </button>
                 </div>
               )}
@@ -376,7 +348,7 @@ function AppContent() {
               <p className="eyebrow">Detection suite</p>
               <h2>Choose a module</h2>
               {!isAuthenticated && (
-                <p className="auth-hint">Login required to select and use detection modules.</p>
+                <p className="auth-hint">Login is optional. You can select modules and analyze content as a guest.</p>
               )}
             </div>
             <div className="card-grid">
@@ -587,9 +559,9 @@ function AppContent() {
           </div>
           <div className="upload-box">
             <p>Drop files here or</p>
-            <button type="button" className="primary-btn">
-              Choose file
-            </button>
+            <a className="primary-btn" href="#fake-news-module">
+              Open analyzer
+            </a>
             <span>Supports mp4, wav, jpg, png, pdf, and txt</span>
           </div>
         </section>
@@ -614,9 +586,7 @@ function AppContent() {
               className="contact-form"
               onSubmit={(event) => {
                 event.preventDefault()
-                requireAuth(() => {
-                  alert('Thank you! Your message has been sent.')
-                })
+                alert('Thank you! Your message has been sent.')
               }}
             >
               <input type="text" placeholder="Your name" required />
@@ -628,10 +598,13 @@ function AppContent() {
         </section>
       </main>
 
+      {showBackToTop && (
+        <a className="back-to-top" href="#top" aria-label="Back to top" title="Back to top">
+          <span aria-hidden="true">↑</span>
+        </a>
+      )}
+
       <footer className="site-footer">
-        <div className="footer-back-top">
-          <a href="#about">Back to top</a>
-        </div>
         <div className="footer-columns">
           <div className="footer-col">
             <h4>Get to Know Us</h4>
