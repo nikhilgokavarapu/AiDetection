@@ -206,7 +206,12 @@ function AppContent() {
                 />
               ) : (
                 <button type="button" className="google-btn" onClick={handleGoogleDemo}>
-                  <span className="google-icon" aria-hidden="true">G</span>
+                  <svg className="google-icon" aria-hidden="true" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M21.35 12.27c0-.78-.07-1.54-.23-2.27H12v4.3h5.23a4.47 4.47 0 0 1-1.94 2.93v2.48h3.18c1.86-1.71 2.88-4.24 2.88-7.44Z" />
+                    <path fill="#34A853" d="M12 21.5c2.66 0 4.9-.88 6.53-2.39l-3.18-2.48c-.88.6-2 .96-3.35.96-2.57 0-4.75-1.74-5.53-4.08H3.19v2.56A9.86 9.86 0 0 0 12 21.5Z" />
+                    <path fill="#FBBC05" d="M6.47 13.51A5.93 5.93 0 0 1 6.16 12c0-.52.11-1.03.31-1.51V7.93H3.19A9.5 9.5 0 0 0 2.5 12c0 1.47.35 2.86.69 4.07l3.28-2.56Z" />
+                    <path fill="#EA4335" d="M12 6.41c1.45 0 2.75.5 3.77 1.48l2.82-2.82C16.9 3.46 14.66 2.5 12 2.5a9.86 9.86 0 0 0-8.81 5.43l3.28 2.56C7.25 8.15 9.43 6.41 12 6.41Z" />
+                  </svg>
                   Continue with Google
                 </button>
               )}
