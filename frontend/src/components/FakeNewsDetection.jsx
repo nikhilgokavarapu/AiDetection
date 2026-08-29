@@ -401,6 +401,20 @@ function FakeNewsDetection({ user, onLogin }) {
                   <span>{result.score}</span>
                   <p>{result.title}</p>
                 </div>
+
+                <div className="confidence-block" aria-label="Confidence meter">
+                  <div className="confidence-header">
+                    <span>Confidence</span>
+                    <strong>{Math.max(50, Math.min(99, Number.parseInt(result.score, 10) || 80))}%</strong>
+                  </div>
+                  <div className="confidence-track">
+                    <div
+                      className="confidence-fill"
+                      style={{ width: `${Math.max(14, Math.min(100, Number.parseInt(result.score, 10) || 80))}%` }}
+                    />
+                  </div>
+                </div>
+
                 <p className="result-desc">{result.description}</p>
                 <ul className="result-highlights">
                   {result.highlights.map((highlight) => (
