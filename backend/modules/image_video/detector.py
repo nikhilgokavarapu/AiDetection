@@ -184,8 +184,17 @@ def predict_video_from_path(file_path: str, max_frames: int = 10):
     }
 
 
-def detect_deepfake(file_path: str, uploaded_file: BinaryIO | None = None):
-    """Entry point for image/video deepfake detection."""
+def detect_deepfake(file_path: str, uploaded_file: BinaryIO | None = None, model_type: str = "xception"):
+    """Entry point for image/video deepfake detection.
+    
+    Args:
+        file_path: Path to the media file
+        uploaded_file: Optional file stream if file was uploaded
+        model_type: 'xception' (default) or 'resnet18' for model selection
+    """
+    if model_type not in ("xception", "resnet18"):
+        model_type = "xception"
+
     if uploaded_file is not None:
         upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
         os.makedirs(upload_dir, exist_ok=True)
@@ -196,6 +205,12 @@ def detect_deepfake(file_path: str, uploaded_file: BinaryIO | None = None):
 
         file_path = temp_path
 
+    # Use ResNet18 detector if specified
+    if model_type == "resnet18":
+        from . import resnet_detector
+        return resnet_detector.detect_deepfake_resnet(file_path)
+
+    # Default to Xception detector
     file_ext = os.path.splitext(file_path)[1].lower()
 
     if file_ext in {".jpg", ".jpeg", ".png"}:

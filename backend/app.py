@@ -50,6 +50,7 @@ async def analyze_content(
     modality: str = Form("image"),
     file: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
+    model_type: str = Form(default="xception"),
 ):
     file_name = file.filename if file else ""
 
@@ -59,7 +60,7 @@ async def analyze_content(
         if ext not in allowed:
             raise HTTPException(status_code=400, detail="Unsupported file type for analysis")
 
-        result = detect_deepfake(file_name, uploaded_file=file.file)
+        result = detect_deepfake(file_name, uploaded_file=file.file, model_type=model_type)
         return {
             "result": {
                 "title": "Deepfake risk detected" if result.get("result", {}).get("label") == "fake" else "Content appears authentic",
