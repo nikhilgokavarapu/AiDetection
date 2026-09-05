@@ -38,6 +38,17 @@ const modules = [
     features: ['Noise inconsistency detection', 'JPEG compression artifacts', 'Error level analysis']
   },
   {
+    id: 'document',
+    name: 'Document Detection',
+    icon: '📄',
+    desc: 'Inspect document images for visual tampering, altered regions, and authenticity signals.',
+    signal: 'Document authenticity confidence',
+    detail: 'Combines layout consistency, visual artifact, and text-region checks to flag forged documents.',
+    useCases: ['Identity document review', 'Invoice verification', 'Evidence authenticity'],
+    riskFactors: ['Altered text regions', 'Spliced document sections', 'Inconsistent compression', 'Layout anomalies'],
+    features: ['Visual forgery screening', 'Document layout analysis', 'Text-region integrity checks']
+  },
+  {
     id: 'text',
     name: 'Text Verification',
     icon: '✍️',

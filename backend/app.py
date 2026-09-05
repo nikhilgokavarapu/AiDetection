@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import tempfile
@@ -50,11 +50,15 @@ async def detect_file(file: UploadFile = File(...)):
 
 @app.post("/api/analyze")
 async def analyze_content(
+    request: Request,
     modality: str = Form("image"),
     file: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
     model_type: str = Form(default="xception"),
 ):
+    if request.headers.get("content-type", "").split(";", 1)[0] == "application/json":
+        raise HTTPException(status_code=422, detail="Expected multipart form data")
+
     file_name = file.filename if file else ""
 
     if file is not None:
@@ -73,7 +77,7 @@ async def analyze_content(
             }
         }
 
-    if text and text.strip():
+    if modality == "text" and text and text.strip():
         cleaned = text.strip()
         fake_score = min(100, max(35, (len(cleaned) % 40) * 2 + 43))
         title = "Synthetic writing pattern detected" if fake_score >= 60 else "Text appears mostly authentic"

@@ -9,6 +9,12 @@ const modalities = [
     accept: 'image/*'
   },
   {
+    id: 'document',
+    label: 'Document Detection',
+    desc: 'Upload a document image to check for visual tampering, altered regions, and authenticity signals.',
+    accept: 'image/jpeg,image/png,image/gif,image/bmp,image/tiff,.tif'
+  },
+  {
     id: 'text',
     label: 'Text',
     desc: 'Upload or paste text to inspect for AI-generated content, semantic drift, and fake-news signals.',
@@ -40,6 +46,14 @@ const sampleResults = {
     score: '82%',
     description: 'Metadata mismatch and editing artifacts indicate a high possibility of manipulated content.',
     highlights: ['Lighting inconsistency', 'Compression artifact anomalies', 'Potential copy-move editing']
+  },
+  document: {
+    title: 'Document appears authentic',
+    score: '25%',
+    confidence: 0.25,
+    isReal: true,
+    description: 'No strong document tampering signals were identified in this demo result.',
+    highlights: ['Layout consistency review', 'Visual artifact scan', 'Text region integrity check']
   },
   text: {
     title: 'Synthetic writing pattern detected',
@@ -145,6 +159,41 @@ function FakeNewsDetection({ user, onLogin }) {
     setStatus('analyzing')
     setSaveMessage('')
 
+    const backendUrl = import.meta.env.VITE_BACKEND_API_URL
+    if (activeTab === 'document' && backendUrl) {
+      try {
+        const payload = new FormData()
+        payload.append('file', selectedFile)
+        const response = await fetch(`${backendUrl.replace(/\/$/, '')}/api/detect-document`, {
+          method: 'POST',
+          body: payload
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.detail || data.error || 'The document backend failed.')
+
+        const documentResult = data.result ?? data
+        const score = Number(documentResult.score ?? ((documentResult.confidence ?? 0.5) * 100))
+        const isReal = documentResult.is_real ?? documentResult.isReal ?? (
+          documentResult.label ? documentResult.label === 'real' : score < 50
+        )
+        const confidence = Number(documentResult.confidence ?? Math.max(score, 100 - score) / 100)
+        setStatus('done')
+        setResult({
+          ...documentResult,
+          title: documentResult.title || (isReal ? 'Document appears authentic' : 'Forged document detected'),
+          score: `${Math.round(score)}%`,
+          confidence,
+          isReal,
+          highlights: documentResult.highlights || [],
+          description: documentResult.description || 'The document was analyzed by the authenticity detection pipeline.'
+        })
+      } catch (analysisError) {
+        setStatus('idle')
+        setError(analysisError.message || 'The document backend failed.')
+      }
+      return
+    }
+
     if (!user || !supabase) {
       setTimeout(() => {
         setStatus('done')
@@ -153,7 +202,6 @@ function FakeNewsDetection({ user, onLogin }) {
       return
     }
 
-    const backendUrl = import.meta.env.VITE_BACKEND_API_URL
     if (backendUrl) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -382,7 +430,9 @@ function FakeNewsDetection({ user, onLogin }) {
           )}
 
           <div className="analysis-hint">
-            <p>Supported formats: JPG, PNG, WebP, TIFF, MP4, AVI, MOV, WebM, WAV, MP3, FLAC, OGG, TXT, PDF, DOCX.</p>
+            <p>{activeTab === 'document'
+              ? 'Supported document images: JPG, PNG, GIF, BMP, TIFF.'
+              : 'Supported formats: JPG, PNG, WebP, TIFF, MP4, AVI, MOV, WebM, WAV, MP3, FLAC, OGG, TXT, PDF, DOCX.'}</p>
           </div>
         </div>
 
@@ -397,6 +447,16 @@ function FakeNewsDetection({ user, onLogin }) {
             {status === 'analyzing' && <p>Analyzing content — this may take a moment.</p>}
             {status === 'done' && result && (
               <>
+                {activeTab === 'document' && (
+                  <div className={`document-verdict ${result.isReal ? 'is-real' : 'is-forged'}`}>
+                    <span className="document-verdict-dot" aria-hidden="true" />
+                    <div>
+                      <span className="document-verdict-label">Authenticity</span>
+                      <strong>{result.isReal ? 'Likely authentic' : 'Potentially forged'}</strong>
+                    </div>
+                    <span className="document-confidence">{Math.round((result.confidence ?? 0) * 100)}%</span>
+                  </div>
+                )}
                 <div className="result-score">
                   <span>{result.score}</span>
                   <p>{result.title}</p>
@@ -405,12 +465,16 @@ function FakeNewsDetection({ user, onLogin }) {
                 <div className="confidence-block" aria-label="Confidence meter">
                   <div className="confidence-header">
                     <span>Confidence</span>
-                    <strong>{Math.max(50, Math.min(99, Number.parseInt(result.score, 10) || 80))}%</strong>
+                    <strong>{activeTab === 'document'
+                      ? `${Math.round((result.confidence ?? 0) * 100)}%`
+                      : `${Math.max(50, Math.min(99, Number.parseInt(result.score, 10) || 80))}%`}</strong>
                   </div>
                   <div className="confidence-track">
                     <div
                       className="confidence-fill"
-                      style={{ width: `${Math.max(14, Math.min(100, Number.parseInt(result.score, 10) || 80))}%` }}
+                      style={{ width: `${activeTab === 'document'
+                        ? Math.max(14, Math.min(100, (result.confidence ?? 0) * 100))
+                        : Math.max(14, Math.min(100, Number.parseInt(result.score, 10) || 80))}%` }}
                     />
                   </div>
                 </div>
