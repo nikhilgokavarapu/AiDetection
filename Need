@@ -53,7 +53,7 @@ From backend\:
 
 VALIDATION
 ----------
-- Focused API suite: 18 tests expected to pass.
+- Focused API suite: 19 tests pass.
 - Integration script: 9 tests pass; curl checks require a running server.
 - Integrated modules compile cleanly and have no editor diagnostics.
 - Full pytest may require ML packages and should exclude binary test_results.txt.
@@ -81,6 +81,12 @@ REMAINING WORK
    - Required work: Either add PDF/DOCX text extraction or restrict the frontend picker to .txt.
 
 4. Verify ML dependencies in .venv310.
-5. Add trained checkpoints or set the environment overrides above.
-6. Test real WAV, image, video, text, and document samples.
-7. Keep generated .venv and __pycache__ files out of version control.
+5. Install the trained model checkpoints:
+   - Image/video: deepfake_detector.keras or resnet18_deepfake_best.pth
+   - Text: best_text_detector.pt or TEXT_DETECTOR_MODEL_PATH
+   - Audio: best_model.pt or AUDIO_DETECTOR_MODEL_PATH
+   - Spoofing: trained liveness/presentation-attack checkpoint
+6. Replace document and spoofing demo fallbacks with real model inference.
+7. Resolve PDF/DOCX text uploads by adding extraction support or limiting the frontend to .txt.
+8. Test real WAV, image, video, text, audio, document, and spoofing samples end to end.
+9. Keep generated .venv and __pycache__ files out of version control.
