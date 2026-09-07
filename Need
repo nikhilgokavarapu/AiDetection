@@ -67,9 +67,10 @@ Do not use Python 3.14 with the pinned NumPy/TensorFlow dependency set.
 
 REMAINING WORK
 --------------
-1. Add spoofing detection module and API route.
-   - Current state: Frontend has a Spoofing tab, but no backend detector or route exists.
-   - Required work: Add a detector, define supported media inputs, and connect it to the frontend.
+1. Add trained spoofing model.
+   - API integration complete: backend/modules/spoof_detector.py and /api/analyze modality=spoof are available.
+   - Current state: Uses a validated demo_fallback until a trained liveness/presentation-attack checkpoint is available.
+   - Remaining work: Replace fallback scoring with the trained spoofing model.
 
 2. Replace document demo fallback with a trained model.
    - Current state: /api/detect-document works, but backend/modules/document/detector.py always returns demo_fallback.

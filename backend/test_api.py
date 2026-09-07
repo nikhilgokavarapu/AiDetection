@@ -65,6 +65,53 @@ class TestAnalyzeEndpoint:
         )
         assert response.status_code == 400
 
+    def test_analyze_with_text_file_uses_text_detector(self, client):
+        """Verify UTF-8 text uploads use the notebook-derived text detector."""
+        response = client.post(
+            "/api/analyze",
+            data={"modality": "text"},
+            files={"file": ("article.txt", b"A short article for analysis.", "text/plain")},
+        )
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["mode"] == "demo_fallback"
+        assert isinstance(result["score"], int)
+
+    def test_analyze_with_audio_file_uses_audio_detector(self, client):
+        """Verify audio uploads use the notebook-derived audio detector."""
+        response = client.post(
+            "/api/analyze",
+            data={"modality": "audio"},
+            files={"file": ("voice.wav", b"not a real wav file", "audio/wav")},
+        )
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["mode"] == "demo_fallback"
+        assert 0 <= result["score"] <= 100
+
+    def test_analyze_rejects_mismatched_audio_modality(self, client):
+        """Verify audio files cannot be sent to the image detector path."""
+        response = client.post(
+            "/api/analyze",
+            data={"modality": "image"},
+            files={"file": ("voice.wav", b"not a real wav file", "audio/wav")},
+        )
+        assert response.status_code == 400
+        assert "modality=audio" in response.json()["detail"]
+
+    def test_analyze_with_spoof_file_uses_spoof_detector(self, client):
+        """Verify spoof uploads use the dedicated spoof detector contract."""
+        response = client.post(
+            "/api/analyze",
+            data={"modality": "spoof"},
+            files={"file": ("replay.mp4", b"not a real video", "video/mp4")},
+        )
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["mode"] == "demo_fallback"
+        assert result["label"] == "spoof"
+        assert 0 <= result["score"] <= 100
+
     def test_analyze_no_file_or_text_fails(self, client):
         """Verify request without file or text fails."""
         response = client.post(

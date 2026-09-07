@@ -6,6 +6,9 @@ from pathlib import Path
 
 from modules.image_video.detector import detect_deepfake
 from modules.document.detector import detect_document_forgery
+from modules.text.detector import detect_text
+from modules.audio.detector import detect_audio
+from modules.spoof_detector import detect_spoof
 
 app = FastAPI(title="AI Detection API", version="1.0.0")
 
@@ -62,10 +65,30 @@ async def analyze_content(
     file_name = file.filename if file else ""
 
     if file is not None:
-        allowed = {".jpg", ".jpeg", ".png", ".mp4", ".avi", ".mov", ".webm", ".mp3", ".wav", ".txt"}
+        allowed = {".jpg", ".jpeg", ".png", ".mp4", ".avi", ".mov", ".webm", ".txt", ".mp3", ".wav"}
         ext = "." + file_name.lower().rsplit(".", 1)[-1] if "." in file_name else ""
         if ext not in allowed:
             raise HTTPException(status_code=400, detail="Unsupported file type for analysis")
+
+        if modality == "text" and ext == ".txt":
+            try:
+                uploaded_text = (await file.read()).decode("utf-8")
+                return {"result": detect_text(uploaded_text)}
+            except UnicodeDecodeError as exc:
+                raise HTTPException(status_code=400, detail="Text file must be UTF-8 encoded") from exc
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        if modality == "audio" and ext in {".mp3", ".wav"}:
+            return {"result": detect_audio(file_name, uploaded_file=file.file)}
+
+        if modality == "spoof":
+            return {"result": detect_spoof(file_name, uploaded_file=file.file)}
+
+        if ext == ".txt":
+            raise HTTPException(status_code=400, detail="Text files require modality=text")
+        if ext in {".mp3", ".wav"}:
+            raise HTTPException(status_code=400, detail="Audio files require modality=audio")
 
         result = detect_deepfake(file_name, uploaded_file=file.file, model_type=model_type)
         return {
@@ -78,17 +101,7 @@ async def analyze_content(
         }
 
     if modality == "text" and text and text.strip():
-        cleaned = text.strip()
-        fake_score = min(100, max(35, (len(cleaned) % 40) * 2 + 43))
-        title = "Synthetic writing pattern detected" if fake_score >= 60 else "Text appears mostly authentic"
-        return {
-            "result": {
-                "title": title,
-                "score": int(fake_score),
-                "description": "Text analysis uses a lightweight heuristic to flag AI-like or suspicious writing patterns.",
-                "highlights": ["Style anomaly check", "Semantics drift review", "Sentence structure scan"],
-            }
-        }
+        return {"result": detect_text(text)}
 
     raise HTTPException(status_code=400, detail="No file or text provided for analysis")
 
@@ -108,6 +121,7 @@ async def detect_document(
     if file_ext not in allowed_extensions:
         raise HTTPException(status_code=400, detail="Unsupported document format")
 
+    tmp_path = None
     try:
         # Save uploaded file to temp location
         with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
@@ -116,12 +130,10 @@ async def detect_document(
 
         # Run detection
         result = detect_document_forgery(tmp_path, model_type=model_type)
-        
-        # Cleanup
-        Path(tmp_path).unlink(missing_ok=True)
-        
         return {"result": result.get("result", {}), "mode": result.get("mode", "model")}
-    
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Document analysis failed: {str(exc)}") from exc
+    finally:
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
 
