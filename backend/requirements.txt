@@ -10,6 +10,7 @@ scikit-learn==1.5.1
 librosa==0.10.2.post1
 transformers==4.44.2
 torch==2.1.2
+torchaudio==2.1.2
 torchvision==0.16.2
 pytest==7.4.4
 pytest-asyncio==0.23.2

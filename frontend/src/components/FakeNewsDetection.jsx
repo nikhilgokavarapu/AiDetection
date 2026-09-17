@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
 const modalities = [
@@ -17,8 +17,8 @@ const modalities = [
   {
     id: 'text',
     label: 'Text',
-    desc: 'Upload or paste text to inspect for AI-generated content, semantic drift, and fake-news signals.',
-    accept: '.txt,.pdf,.docx'
+    desc: 'Upload or paste text for hybrid DeBERTa-v3 analysis of synthetic writing and authorship signals.',
+    accept: '.txt'
   },
   {
     id: 'video',
@@ -91,8 +91,13 @@ function FakeNewsDetection({ user, onLogin }) {
   const [savedReports, setSavedReports] = useState([])
   const [requestHistory, setRequestHistory] = useState([])
   const [saveMessage, setSaveMessage] = useState('')
+  const demoTimerRef = useRef(null)
 
   const activeModality = modalities.find((item) => item.id === activeTab)
+
+  useEffect(() => () => {
+    if (demoTimerRef.current) window.clearTimeout(demoTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (!user || !supabase) {
@@ -122,6 +127,10 @@ function FakeNewsDetection({ user, onLogin }) {
   }, [user])
 
   const resetState = () => {
+    if (demoTimerRef.current) {
+      window.clearTimeout(demoTimerRef.current)
+      demoTimerRef.current = null
+    }
     setSelectedFile(null)
     setManualText('')
     setStatus('idle')
@@ -194,42 +203,44 @@ function FakeNewsDetection({ user, onLogin }) {
       return
     }
 
-    if (!user || !supabase) {
-      setTimeout(() => {
-        setStatus('done')
-        setResult(sampleResults[activeTab])
-      }, 1100)
-      return
-    }
-
     if (backendUrl) {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.access_token) throw new Error('Your session has expired. Please log in again.')
         const payload = new FormData()
         payload.append('modality', activeTab)
         if (manualText.trim()) payload.append('text', manualText.trim())
         if (selectedFile) payload.append('file', selectedFile)
+
         const response = await fetch(`${backendUrl.replace(/\/$/, '')}/api/analyze`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
           body: payload
         })
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error || 'The analysis backend failed.')
-        const backendResult = data.result
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.detail || data.error || 'The analysis backend failed.')
+
+        const backendResult = data.result ?? data
+        const score = Number(backendResult.score)
+        if (!Number.isFinite(score)) throw new Error('The analysis backend returned an invalid score.')
+
         setStatus('done')
-        setResult({ ...backendResult, score: `${backendResult.score}%`, resultId: backendResult.id })
-        setRequestHistory((current) => [{
-          id: data.requestId,
-          modality: activeTab,
-          status: 'completed',
-          analysis_results: [{ score: backendResult.score, title: backendResult.title }]
-        }, ...current].slice(0, 5))
+        setResult({
+          ...backendResult,
+          score: `${Math.round(Math.max(0, Math.min(100, score)))}%`,
+          resultId: backendResult.id,
+          highlights: Array.isArray(backendResult.highlights) ? backendResult.highlights : [],
+          description: backendResult.description || 'The content was analyzed by the configured detection pipeline.'
+        })
       } catch (analysisError) {
         setStatus('idle')
         setError(analysisError.message || 'The analysis backend failed.')
       }
+      return
+    }
+
+    if (!user || !supabase) {
+      demoTimerRef.current = window.setTimeout(() => {
+        setStatus('done')
+        setResult(sampleResults[activeTab])
+      }, 1100)
       return
     }
 
@@ -412,8 +423,8 @@ function FakeNewsDetection({ user, onLogin }) {
           {error && <p className="error-text">{error}</p>}
 
           <div className="analysis-actions">
-            <button type="button" className="primary-btn" onClick={handleRunAnalysis}>
-              Run analysis
+            <button type="button" className="primary-btn" onClick={handleRunAnalysis} disabled={status === 'analyzing'}>
+              {status === 'analyzing' ? 'Analyzing...' : 'Run analysis'}
             </button>
             <button type="button" className="ghost-btn compact" onClick={resetState}>
               Reset
@@ -431,8 +442,10 @@ function FakeNewsDetection({ user, onLogin }) {
 
           <div className="analysis-hint">
             <p>{activeTab === 'document'
-              ? 'Supported document images: JPG, PNG, GIF, BMP, TIFF.'
-              : 'Supported formats: JPG, PNG, WebP, TIFF, MP4, AVI, MOV, WebM, WAV, MP3, FLAC, OGG, TXT, PDF, DOCX.'}</p>
+              ? 'Supported document images: JPG, JPEG, PNG, PDF, TIFF.'
+              : activeTab === 'text'
+                ? 'Text model: hybrid DeBERTa-v3. Paste text or upload a UTF-8 TXT file.'
+                : 'Supported formats: JPG, JPEG, PNG, MP4, AVI, MOV, WebM, WAV, MP3.'}</p>
           </div>
         </div>
 
@@ -480,8 +493,13 @@ function FakeNewsDetection({ user, onLogin }) {
                 </div>
 
                 <p className="result-desc">{result.description}</p>
+                {result.mode && (
+                  <p className="analysis-mode">
+                    Source: {result.mode === 'demo_fallback' ? 'local demo fallback' : 'configured detection model'}
+                  </p>
+                )}
                 <ul className="result-highlights">
-                  {result.highlights.map((highlight) => (
+                  {(result.highlights || []).map((highlight) => (
                     <li key={highlight}>{highlight}</li>
                   ))}
                 </ul>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 128" role="img" aria-labelledby="logo-title logo-desc">
+  <title id="logo-title">Deepfake Defense</title>
+  <desc id="logo-desc">A verification shield with an observing eye and signal waveform beside the Deepfake Defense wordmark.</desc>
+  <defs>
+    <linearGradient id="shield" x1="8" y1="4" x2="106" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8BE9FF"/>
+      <stop offset="0.48" stop-color="#347FE0"/>
+      <stop offset="1" stop-color="#182D68"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="28" y1="46" x2="91" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#B9F6FF"/>
+      <stop offset="1" stop-color="#FFD166"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 5 111 22v35c0 28.8-17.4 50.2-47 64C34.4 107.2 17 85.8 17 57V22L64 5Z" fill="#08152F" stroke="#31547D" stroke-width="3"/>
+  <path d="M64 12 101 26v31c0 24.3-14.1 42.4-37 54-22.9-11.6-37-29.7-37-54V26l37-14Z" fill="url(#shield)"/>
+  <path d="M34 62c8.2-11 18.2-16.5 30-16.5S85.8 51 94 62c-8.2 11-18.2 16.5-30 16.5S42.2 73 34 62Z" fill="#0A1A39" fill-opacity=".76" stroke="#D9F8FF" stroke-opacity=".76" stroke-width="2.5"/>
+  <circle cx="64" cy="62" r="12" fill="#EAFDFF"/>
+  <circle cx="64" cy="62" r="6" fill="#1B4E9B"/>
+  <path d="M32 91c6-4 10-9 14-16 4 7 8 10 12 10 6 0 9-18 15-18 5 0 8 7 13 7 4 0 8-3 12-8" fill="none" stroke="url(#signal)" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <text x="135" y="61" fill="#F5F7FF" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="35" font-weight="800" letter-spacing="-1.2">DEEPFAKE</text>
+  <text x="137" y="96" fill="#77E0FF" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="27" font-weight="700" letter-spacing="4">DEFENSE</text>
+  <path d="M137 108h246" stroke="#31547D" stroke-width="2"/>
+  <circle cx="393" cy="108" r="3.5" fill="#FFD166"/>
+  <text x="410" y="112" fill="#8EA1C4" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="9" font-weight="700" letter-spacing="2">VERIFY</text>
+</svg>

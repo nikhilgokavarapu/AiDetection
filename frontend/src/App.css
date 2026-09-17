@@ -19,15 +19,18 @@
   gap: 12px;
 }
 
-.brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  background: linear-gradient(135deg, #5fb5ff, #7c4dff);
-  color: white;
+.brand-logo {
+  width: 178px;
+  height: 52px;
+  display: block;
+  object-fit: contain;
+  object-position: left center;
+  flex: 0 0 auto;
+}
+
+.brand-logo.small {
+  width: 142px;
+  height: 42px;
 }
 
 .brand-title {

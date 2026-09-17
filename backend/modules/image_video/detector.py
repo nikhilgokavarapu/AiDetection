@@ -213,6 +213,11 @@ def detect_deepfake(file_path: str, uploaded_file: BinaryIO | None = None, model
     # Default to Xception detector
     file_ext = os.path.splitext(file_path)[1].lower()
 
+    if file_ext not in {".jpg", ".jpeg", ".png", ".mp4", ".avi", ".mov", ".webm"}:
+        raise ValueError(f"Unsupported media type for file: {file_path}")
+    if uploaded_file is None and os.path.isabs(file_path) and not os.path.exists(file_path):
+        raise FileNotFoundError(f"Media file not found: {file_path}")
+
     if file_ext in {".jpg", ".jpeg", ".png"}:
         return predict_image_from_path(file_path)
     if file_ext in {".mp4", ".avi", ".mov", ".webm"}:

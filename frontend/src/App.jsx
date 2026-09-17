@@ -124,7 +124,7 @@ function AppContent() {
     setAuthMessage('')
   }
 
-  const handleAuthSubmit = (event) => {
+  const handleAuthSubmit = async (event) => {
     event.preventDefault()
     if (!supabase) {
       setAuthMessage('Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your .env file.')
@@ -132,11 +132,11 @@ function AppContent() {
     }
 
     setAuthMessage('')
-    const authAction = authMode === 'signup'
-      ? supabase.auth.signUp({ email: authData.email, password: authData.password })
-      : supabase.auth.signInWithPassword({ email: authData.email, password: authData.password })
-
-    authAction.then(({ data, error }) => {
+    setAuthLoading(true)
+    try {
+      const { data, error } = await (authMode === 'signup'
+        ? supabase.auth.signUp({ email: authData.email, password: authData.password })
+        : supabase.auth.signInWithPassword({ email: authData.email, password: authData.password }))
       if (error) {
         setAuthMessage(error.message)
         return
@@ -147,7 +147,11 @@ function AppContent() {
       }
       setAuthOpen(false)
       setAuthData({ email: '', password: '' })
-    })
+    } catch (authError) {
+      setAuthMessage(authError.message || 'Authentication failed. Please try again.')
+    } finally {
+      setAuthLoading(false)
+    }
   }
 
   const handleSignOut = async () => {
@@ -162,7 +166,7 @@ function AppContent() {
     <div id="top" className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark">AI</div>
+          <img className="brand-logo" src="/deepfake-defense-logo.svg" alt="Deepfake Defense logo" />
           <div>
             <p className="brand-title">Deepfake Defense</p>
             <span className="brand-subtitle">Deepfake and media authenticity platform</span>
@@ -673,7 +677,7 @@ function AppContent() {
         </div>
         <div className="footer-bottom">
           <div className="footer-brand">
-            <div className="brand-mark small">AI</div>
+            <img className="brand-logo small" src="/deepfake-defense-logo.svg" alt="" aria-hidden="true" />
             <span>Deepfake Defense</span>
           </div>
           <p className="footer-copy">

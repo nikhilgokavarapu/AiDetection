@@ -3,7 +3,11 @@
 import pytest
 import os
 import tempfile
-import numpy as np
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 try:
     import cv2
@@ -20,8 +24,8 @@ from modules.image_video.detector import (
 @pytest.fixture
 def sample_image():
     """Create a sample image for testing."""
-    if cv2 is None:
-        pytest.skip("OpenCV not available")
+    if cv2 is None or np is None:
+        pytest.skip("OpenCV and NumPy are not available")
     
     # Create a dummy RGB image (100x100)
     img = np.random.randint(0, 256, (100, 100, 3), dtype=np.uint8)

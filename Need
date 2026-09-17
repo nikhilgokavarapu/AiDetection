@@ -40,7 +40,7 @@ API ROUTES
 GET  /                     Backend status
 GET  /health               Health check
 POST /api/detect           Image/video detection
-POST /api/analyze          Text, image, video, and audio analysis
+POST /api/analyze          Text, image, video, audio, and spoofing analysis
 POST /api/detect-document  Document forgery analysis
 
 RUN THE BACKEND
@@ -53,10 +53,13 @@ From backend\:
 
 VALIDATION
 ----------
+- Full backend suite: 34 passed, 6 skipped when optional OpenCV/NumPy packages are unavailable.
 - Focused API suite: 19 tests pass.
 - Integration script: 9 tests pass; curl checks require a running server.
+- Frontend lint: passed.
+- Frontend production build: passed.
 - Integrated modules compile cleanly and have no editor diagnostics.
-- Full pytest may require ML packages and should exclude binary test_results.txt.
+- Root pytest.ini excludes binary test_results.txt from collection.
 
 INSTALLATION
 ------------
@@ -67,26 +70,36 @@ Do not use Python 3.14 with the pinned NumPy/TensorFlow dependency set.
 
 REMAINING WORK
 --------------
-1. Add trained spoofing model.
-   - API integration complete: backend/modules/spoof_detector.py and /api/analyze modality=spoof are available.
-   - Current state: Uses a validated demo_fallback until a trained liveness/presentation-attack checkpoint is available.
-   - Remaining work: Replace fallback scoring with the trained spoofing model.
+P0 - BLOCKING RUNTIME SETUP
+---------------------------
+1. Install and verify ML dependencies in .venv310.
+   - Current blocker: NumPy and other ML packages are missing.
+   - Command: .\.venv310\Scripts\python.exe -m pip install -r backend\requirements.txt
 
-2. Replace document demo fallback with a trained model.
-   - Current state: /api/detect-document works, but backend/modules/document/detector.py always returns demo_fallback.
-   - Required work: Add document model weights and implement real visual/text inference.
-
-3. Resolve text upload format mismatch.
-   - Current state: Frontend advertises .txt, .pdf, and .docx; backend supports UTF-8 .txt only.
-   - Required work: Either add PDF/DOCX text extraction or restrict the frontend picker to .txt.
-
-4. Verify ML dependencies in .venv310.
-5. Install the trained model checkpoints:
+P1 - ENABLE REAL DETECTION
+--------------------------
+2. Add the trained model checkpoints:
    - Image/video: deepfake_detector.keras or resnet18_deepfake_best.pth
    - Text: best_text_detector.pt or TEXT_DETECTOR_MODEL_PATH
    - Audio: best_model.pt or AUDIO_DETECTOR_MODEL_PATH
    - Spoofing: trained liveness/presentation-attack checkpoint
-6. Replace document and spoofing demo fallbacks with real model inference.
-7. Resolve PDF/DOCX text uploads by adding extraction support or limiting the frontend to .txt.
-8. Test real WAV, image, video, text, audio, document, and spoofing samples end to end.
-9. Keep generated .venv and __pycache__ files out of version control.
+3. Replace document demo fallback with real visual/text inference.
+   - Endpoint currently works, but backend/modules/document/detector.py returns demo_fallback.
+4. Replace spoofing demo fallback with trained liveness/presentation-attack inference.
+   - API integration is complete at /api/analyze with modality=spoof.
+
+P2 - VERIFY REAL BEHAVIOR
+-------------------------
+5. Test real image, video, text, audio, document, and spoofing samples end to end.
+6. Confirm model-backed responses report the correct model mode and score ranges.
+
+P3 - OPTIONAL PRODUCT ENHANCEMENTS
+----------------------------------
+7. Add PDF/DOCX text extraction if those formats are required.
+   - Frontend currently accepts only .txt, matching backend support.
+8. Keep generated .venv and __pycache__ files out of version control.
+
+CURRENT BLOCKERS
+----------------
+- No trained model checkpoint files are present in the repository.
+- Real document, spoofing, text, audio, and image/video inference requires both model weights and the installed ML dependencies.
