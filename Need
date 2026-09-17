@@ -53,13 +53,15 @@ From backend\:
 
 VALIDATION
 ----------
-- Full backend suite: 34 passed, 6 skipped when optional OpenCV/NumPy packages are unavailable.
+- Dependency import check: all declared ML imports available in .venv310.
+- Dependency consistency: pip check passed with no broken requirements.
 - Focused API suite: 19 tests pass.
 - Integration script: 9 tests pass; curl checks require a running server.
 - Frontend lint: passed.
 - Frontend production build: passed.
 - Integrated modules compile cleanly and have no editor diagnostics.
 - Root pytest.ini excludes binary test_results.txt from collection.
+- Full backend suite after dependency installation: 34 passed, 6 failed; remaining failures are image/video preprocessing and relative placeholder fallback behavior.
 
 INSTALLATION
 ------------
@@ -73,8 +75,8 @@ REMAINING WORK
 P0 - BLOCKING RUNTIME SETUP
 ---------------------------
 1. Install and verify ML dependencies in .venv310.
-   - Current blocker: NumPy and other ML packages are missing.
-   - Command: .\.venv310\Scripts\python.exe -m pip install -r backend\requirements.txt
+   - Completed: all declared imports are available and pip check passes.
+   - Re-run command when rebuilding the environment: .\.venv310\Scripts\python.exe -m pip install -r backend\requirements.txt
 
 P1 - ENABLE REAL DETECTION
 --------------------------
@@ -92,14 +94,17 @@ P2 - VERIFY REAL BEHAVIOR
 -------------------------
 5. Test real image, video, text, audio, document, and spoofing samples end to end.
 6. Confirm model-backed responses report the correct model mode and score ranges.
+7. Fix six full-suite image/video failures exposed after installing OpenCV/TensorFlow:
+   - Restore the expected Xception preprocessing tensor layout.
+   - Preserve demo fallback for relative placeholder media paths used by integration tests.
 
 P3 - OPTIONAL PRODUCT ENHANCEMENTS
 ----------------------------------
-7. Add PDF/DOCX text extraction if those formats are required.
+8. Add PDF/DOCX text extraction if those formats are required.
    - Frontend currently accepts only .txt, matching backend support.
-8. Keep generated .venv and __pycache__ files out of version control.
+9. Keep generated .venv and __pycache__ files out of version control.
 
 CURRENT BLOCKERS
 ----------------
 - No trained model checkpoint files are present in the repository.
-- Real document, spoofing, text, audio, and image/video inference requires both model weights and the installed ML dependencies.
+- Real document, spoofing, text, audio, and image/video inference requires model weights.
