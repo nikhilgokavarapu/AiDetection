@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+backend/test_results.txt
 node_modules/
 dist/
 build/
