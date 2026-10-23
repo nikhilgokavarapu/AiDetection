@@ -300,12 +300,20 @@ class TestTextAnalysisLogic:
 class TestCORSHeaders:
     """Test CORS middleware configuration."""
 
-    def test_cors_headers_present(self, client):
-        """Verify local frontend origins receive explicit CORS permission."""
-        response = client.get("/health", headers={"Origin": "http://localhost:5173"})
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ],
+    )
+    def test_cors_headers_present(self, client, origin):
+        """Verify Vite local frontend origins receive explicit CORS permission."""
+        response = client.get("/health", headers={"Origin": origin})
 
         assert response.status_code == 200
-        assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+        assert response.headers["access-control-allow-origin"] == origin
 
 
 class TestErrorHandling:
