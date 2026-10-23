@@ -82,6 +82,8 @@ function AppContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [droppedFile, setDroppedFile] = useState(null)
+  const [isUploadDragOver, setIsUploadDragOver] = useState(false)
   const selectedModule = modules.find((module) => module.id === activeModule) ?? modules[0]
 
   const isAuthenticated = Boolean(user)
@@ -429,7 +431,12 @@ function AppContent() {
           </div>
         </section>
 
-        <FakeNewsDetection user={user} onLogin={openAuth} />
+        <FakeNewsDetection
+          user={user}
+          onLogin={openAuth}
+          droppedFile={droppedFile}
+          onDroppedFileHandled={setDroppedFile}
+        />
 
         <section id="details" className="panel-card details-section">
           <div className="section-heading">
@@ -582,7 +589,24 @@ function AppContent() {
               Drag and drop videos, audio, images, or text to inspect authenticity and spoof risk.
             </p>
           </div>
-          <div className="upload-box">
+          <div
+            className={`upload-box ${isUploadDragOver ? 'is-drag-over' : ''}`}
+            onDragOver={(event) => {
+              event.preventDefault()
+              setIsUploadDragOver(true)
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setIsUploadDragOver(false)
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              setIsUploadDragOver(false)
+              const file = event.dataTransfer.files?.[0]
+              if (!file) return
+              setDroppedFile(file)
+              document.getElementById('fake-news-module')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+          >
             <p>Drop files here or</p>
             <a className="primary-btn" href="#fake-news-module">
               Open analyzer

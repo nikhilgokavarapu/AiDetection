@@ -6,13 +6,13 @@ const modalities = [
     id: 'image',
     label: 'Image',
     desc: 'Upload suspicious images to detect manipulation, deepfake traces, and tampering artifacts.',
-    accept: 'image/*'
+    accept: '.jpg,.jpeg,.png'
   },
   {
     id: 'document',
     label: 'Document Detection',
     desc: 'Upload a document image to check for visual tampering, altered regions, and authenticity signals.',
-    accept: 'image/jpeg,image/png,image/gif,image/bmp,image/tiff,.tif'
+    accept: '.jpg,.jpeg,.png,.pdf,.tif,.tiff'
   },
   {
     id: 'text',
@@ -24,21 +24,40 @@ const modalities = [
     id: 'video',
     label: 'Video',
     desc: 'Upload video evidence to review temporal consistency, lip-sync anomalies, and frame integrity.',
-    accept: 'video/*'
+    accept: '.mp4,.avi,.mov,.webm'
   },
   {
     id: 'audio',
     label: 'Audio',
     desc: 'Upload audio to analyze voice cloning, synthesis artifacts, and suspicious spectral patterns.',
-    accept: 'audio/*'
+    accept: '.mp3,.wav'
   },
   {
     id: 'spoof',
     label: 'Spoofing',
     desc: 'Optionally evaluate biometric and presentation attack risk in submitted media.',
-    accept: 'image/*,video/*,audio/*'
+    accept: '.jpg,.jpeg,.png,.mp4,.avi,.mov,.webm,.mp3,.wav'
   }
 ]
+
+function getModalityForFile(file) {
+  const filename = file.name.toLowerCase()
+  return modalities.find((modality) =>
+    modality.accept.split(',').some((extension) => filename.endsWith(extension))
+  )?.id ?? 'image'
+}
+
+function isFileSupported(file, modalityId) {
+  const modality = modalities.find((item) => item.id === modalityId)
+  const filename = file.name.toLowerCase()
+  return Boolean(modality?.accept.split(',').some((extension) => filename.endsWith(extension)))
+}
+
+function formatFileSize(size) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
 
 const sampleResults = {
   image: {
@@ -81,7 +100,7 @@ const sampleResults = {
   }
 }
 
-function FakeNewsDetection({ user, onLogin }) {
+function FakeNewsDetection({ user, onLogin, droppedFile, onDroppedFileHandled }) {
   const [activeTab, setActiveTab] = useState('image')
   const [selectedFile, setSelectedFile] = useState(null)
   const [manualText, setManualText] = useState('')
@@ -91,9 +110,29 @@ function FakeNewsDetection({ user, onLogin }) {
   const [savedReports, setSavedReports] = useState([])
   const [requestHistory, setRequestHistory] = useState([])
   const [saveMessage, setSaveMessage] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [analysisCompletedAt, setAnalysisCompletedAt] = useState(null)
   const demoTimerRef = useRef(null)
 
   const activeModality = modalities.find((item) => item.id === activeTab)
+
+  const completeAnalysis = (analysisResult) => {
+    setResult(analysisResult)
+    setAnalysisCompletedAt(new Date())
+    setStatus('done')
+  }
+
+  useEffect(() => {
+    if (!droppedFile) return
+
+    const modalityId = getModalityForFile(droppedFile)
+    setActiveTab(modalityId)
+    setSelectedFile(isFileSupported(droppedFile, modalityId) ? droppedFile : null)
+    setStatus('idle')
+    setResult(null)
+    setError(isFileSupported(droppedFile, modalityId) ? '' : 'This file format is not supported.')
+    onDroppedFileHandled(null)
+  }, [droppedFile, onDroppedFileHandled])
 
   useEffect(() => () => {
     if (demoTimerRef.current) window.clearTimeout(demoTimerRef.current)
@@ -145,6 +184,29 @@ function FakeNewsDetection({ user, onLogin }) {
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] ?? null
+    if (file && !isFileSupported(file, activeTab)) {
+      setSelectedFile(null)
+      setError('This file format is not supported for the selected modality.')
+      return
+    }
+    setSelectedFile(file)
+    setStatus('idle')
+    setResult(null)
+    setError('')
+  }
+
+  const handleFileDrop = (event) => {
+    event.preventDefault()
+    setIsDragOver(false)
+    const file = event.dataTransfer.files?.[0]
+    if (!file) return
+
+    if (!isFileSupported(file, activeTab)) {
+      setSelectedFile(null)
+      setError('This file format is not supported for the selected modality.')
+      return
+    }
+
     setSelectedFile(file)
     setStatus('idle')
     setResult(null)
@@ -186,8 +248,7 @@ function FakeNewsDetection({ user, onLogin }) {
           documentResult.label ? documentResult.label === 'real' : score < 50
         )
         const confidence = Number(documentResult.confidence ?? Math.max(score, 100 - score) / 100)
-        setStatus('done')
-        setResult({
+        completeAnalysis({
           ...documentResult,
           title: documentResult.title || (isReal ? 'Document appears authentic' : 'Forged document detected'),
           score: `${Math.round(score)}%`,
@@ -221,8 +282,7 @@ function FakeNewsDetection({ user, onLogin }) {
         const score = Number(backendResult.score)
         if (!Number.isFinite(score)) throw new Error('The analysis backend returned an invalid score.')
 
-        setStatus('done')
-        setResult({
+        completeAnalysis({
           ...backendResult,
           score: `${Math.round(Math.max(0, Math.min(100, score)))}%`,
           resultId: backendResult.id,
@@ -238,8 +298,7 @@ function FakeNewsDetection({ user, onLogin }) {
 
     if (!user || !supabase) {
       demoTimerRef.current = window.setTimeout(() => {
-        setStatus('done')
-        setResult(sampleResults[activeTab])
+        completeAnalysis({ ...sampleResults[activeTab], mode: 'demo_fallback' })
       }, 1100)
       return
     }
@@ -317,8 +376,7 @@ function FakeNewsDetection({ user, onLogin }) {
         { ...request, status: 'completed', analysis_results: [{ score: persistedResult.score, title: persistedResult.title }] },
         ...current
       ].slice(0, 5))
-      setStatus('done')
-      setResult({
+      completeAnalysis({
         ...persistedResult,
         score: `${persistedResult.score}%`,
         resultId: persistedResult.id
@@ -366,6 +424,10 @@ function FakeNewsDetection({ user, onLogin }) {
   }
 
   const fileLabel = selectedFile ? selectedFile.name : 'No file selected yet.'
+  const reportedConfidence = Number(result?.confidence)
+  const confidencePercent = Number.isFinite(reportedConfidence)
+    ? Math.round(reportedConfidence <= 1 ? reportedConfidence * 100 : reportedConfidence)
+    : null
 
   return (
     <section id="fake-news-module" className="panel-card fake-news-panel">
@@ -391,7 +453,16 @@ function FakeNewsDetection({ user, onLogin }) {
         <div className="detection-panel">
           <p className="detection-copy">{activeModality?.desc}</p>
 
-          <label htmlFor="fake-news-upload" className="upload-input-label">
+          <label
+            htmlFor="fake-news-upload"
+            className={`upload-input-label ${isDragOver ? 'is-drag-over' : ''}`}
+            onDragOver={(event) => {
+              event.preventDefault()
+              setIsDragOver(true)
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleFileDrop}
+          >
             <span>{activeTab === 'text' ? 'Upload text file' : 'Choose file'}</span>
             <input
               id="fake-news-upload"
@@ -475,34 +546,67 @@ function FakeNewsDetection({ user, onLogin }) {
                   <p>{result.title}</p>
                 </div>
 
-                <div className="confidence-block" aria-label="Confidence meter">
+                <div className="confidence-block" aria-label="Risk score meter">
                   <div className="confidence-header">
-                    <span>Confidence</span>
-                    <strong>{activeTab === 'document'
-                      ? `${Math.round((result.confidence ?? 0) * 100)}%`
-                      : `${Math.max(50, Math.min(99, Number.parseInt(result.score, 10) || 80))}%`}</strong>
+                    <span>Risk score</span>
+                    <strong>{result.score}</strong>
                   </div>
                   <div className="confidence-track">
                     <div
                       className="confidence-fill"
-                      style={{ width: `${activeTab === 'document'
-                        ? Math.max(14, Math.min(100, (result.confidence ?? 0) * 100))
-                        : Math.max(14, Math.min(100, Number.parseInt(result.score, 10) || 80))}%` }}
+                      style={{ width: `${Math.max(0, Math.min(100, Number.parseInt(result.score, 10) || 0))}%` }}
                     />
                   </div>
                 </div>
 
                 <p className="result-desc">{result.description}</p>
-                {result.mode && (
-                  <p className="analysis-mode">
-                    Source: {result.mode === 'demo_fallback' ? 'local demo fallback' : 'configured detection model'}
-                  </p>
-                )}
                 <ul className="result-highlights">
                   {(result.highlights || []).map((highlight) => (
                     <li key={highlight}>{highlight}</li>
                   ))}
                 </ul>
+                <section className="analysis-details" aria-label="Analysis details">
+                  <h4>Analysis details</h4>
+                  <dl>
+                    <dt>Modality</dt>
+                    <dd>{activeModality?.label || activeTab}</dd>
+                    {selectedFile ? (
+                      <>
+                        <dt>File</dt>
+                        <dd>{selectedFile.name}</dd>
+                        <dt>File type</dt>
+                        <dd>{selectedFile.type || 'Unknown'}</dd>
+                        <dt>File size</dt>
+                        <dd>{formatFileSize(selectedFile.size)}</dd>
+                      </>
+                    ) : activeTab === 'text' && manualText.trim() ? (
+                      <>
+                        <dt>Input</dt>
+                        <dd>Pasted text</dd>
+                        <dt>Characters</dt>
+                        <dd>{manualText.trim().length.toLocaleString()}</dd>
+                      </>
+                    ) : null}
+                    {confidencePercent !== null && (
+                      <>
+                        <dt>Reported confidence</dt>
+                        <dd>{confidencePercent}%</dd>
+                      </>
+                    )}
+                    {result.mode && (
+                      <>
+                        <dt>Analysis source</dt>
+                        <dd>{result.mode === 'demo_fallback' ? 'Demo fallback' : result.mode}</dd>
+                      </>
+                    )}
+                    {analysisCompletedAt && (
+                      <>
+                        <dt>Completed</dt>
+                        <dd>{analysisCompletedAt.toLocaleString()}</dd>
+                      </>
+                    )}
+                  </dl>
+                </section>
               </>
             )}
           </div>

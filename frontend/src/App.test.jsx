@@ -101,6 +101,29 @@ describe('File Upload', () => {
     // File summary should update
     expect(screen.getByText(/test.jpg/)).toBeInTheDocument()
   })
+
+  it('accepts an image dropped on the analyzer upload control', () => {
+    render(<App />)
+    const uploadLabel = screen.getByText(/Choose file/i).closest('label')
+    const file = new File(['image'], 'dropped.png', { type: 'image/png' })
+
+    fireEvent.drop(uploadLabel, { dataTransfer: { files: [file] } })
+
+    expect(screen.getByText(/dropped.png/)).toBeInTheDocument()
+  })
+
+  it('routes a video dropped on the page upload area to the video modality', async () => {
+    render(<App />)
+    const uploadArea = screen.getByText(/Drop files here or/i).closest('.upload-box')
+    const file = new File(['video'], 'dropped.mp4', { type: 'video/mp4' })
+
+    fireEvent.drop(uploadArea, { dataTransfer: { files: [file] } })
+
+    await waitFor(() => {
+      expect(screen.getByText(/dropped.mp4/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Video/ })).toHaveClass('active')
+    })
+  })
 })
 
 describe('Text Input', () => {
