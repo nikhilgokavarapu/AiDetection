@@ -168,10 +168,10 @@ function AppContent() {
     <div id="top" className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <img className="brand-logo" src="/deepfake-defense-logo.svg" alt="Deepfake Defense logo" />
+          <img className="brand-logo" src="/deepdetect-ai-mark.png" alt="DeepDetect AI logo" />
           <div>
-            <p className="brand-title">Deepfake Defense</p>
-            <span className="brand-subtitle">Deepfake and media authenticity platform</span>
+            <p className="brand-title">DeepDetect AI</p>
+            <span className="brand-subtitle">Detect What’s Real</span>
           </div>
         </div>
         <nav className="topnav" aria-label="Primary navigation">
@@ -701,11 +701,11 @@ function AppContent() {
         </div>
         <div className="footer-bottom">
           <div className="footer-brand">
-            <img className="brand-logo small" src="/deepfake-defense-logo.svg" alt="" aria-hidden="true" />
-            <span>Deepfake Defense</span>
+            <img className="brand-logo small" src="/deepdetect-ai-mark.png" alt="" aria-hidden="true" />
+            <span>DeepDetect AI</span>
           </div>
           <p className="footer-copy">
-            © {new Date().getFullYear()} Deepfake Defense. Built for secure digital trust and content verification.
+            © {new Date().getFullYear()} DeepDetect AI. Built for secure digital trust and content verification.
           </p>
         </div>
       </footer>
