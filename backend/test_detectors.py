@@ -99,8 +99,8 @@ class TestImagePreprocessing:
         result = preprocess_image(sample_image)
         
         assert isinstance(result, np.ndarray)
-        # Should be batch of 1, 3 channels, 299x299
-        assert result.shape == (1, 3, 299, 299)
+        # Xception uses channels-last input: batch, height, width, channels.
+        assert result.shape == (1, 299, 299, 3)
 
     def test_preprocess_image_normalized(self, sample_image):
         """Verify preprocessing normalizes pixel values."""
@@ -151,9 +151,9 @@ class TestDetectorIntegration:
         assert "result" in result
         assert result["mode"] == "demo_fallback"
 
-    def test_resnet18_fallback_mode(self):
+    def test_resnet18_fallback_mode(self, temp_image_file):
         """Verify ResNet18 detector falls back gracefully."""
-        result = detect_deepfake("test_image.jpg", model_type="resnet18")
+        result = detect_deepfake(temp_image_file, model_type="resnet18")
         
         assert "result" in result
         assert result["mode"] == "demo_fallback"

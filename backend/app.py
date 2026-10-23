@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import os
 import tempfile
 from pathlib import Path
 
@@ -12,9 +13,16 @@ from modules.spoof_detector import detect_spoof
 
 app = FastAPI(title="AI Detection API", version="1.0.0")
 
+default_cors_origins = "http://localhost:5173,http://127.0.0.1:5173"
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", default_cors_origins).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -91,12 +99,20 @@ async def analyze_content(
             raise HTTPException(status_code=400, detail="Audio files require modality=audio")
 
         result = detect_deepfake(file_name, uploaded_file=file.file, model_type=model_type)
+        prediction = result.get("result")
+        prediction = prediction if isinstance(prediction, dict) else {}
+        probability = result.get("average_probability")
+        if probability is None:
+            probability = prediction.get("probability", 0.5)
+        label = result.get("label") or prediction.get("label")
         return {
             "result": {
-                "title": "Deepfake risk detected" if result.get("result", {}).get("label") == "fake" else "Content appears authentic",
-                "score": int(round((result.get("result", {}).get("probability", 0.5) if isinstance(result.get("result", {}), dict) else 0.5) * 100)),
+                "title": "Deepfake risk detected" if label == "fake" else "Content appears authentic",
+                "score": int(round(float(probability) * 100)),
                 "description": "The uploaded media was analyzed using the project detector pipeline.",
                 "highlights": ["Model pipeline active", "Frame-level signal review", "Media authenticity assessment"],
+                "mode": result.get("mode", "unknown"),
+                "confidence": result.get("confidence", prediction.get("confidence")),
             }
         }
 

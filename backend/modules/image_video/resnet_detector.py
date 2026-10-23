@@ -1,6 +1,7 @@
 """PyTorch ResNet18-based deepfake detection for images and video frames."""
 
 import os
+import tempfile
 from typing import BinaryIO
 
 try:
@@ -209,21 +210,21 @@ def predict_video_from_path(file_path: str, max_frames: int = 10, device: str = 
 
 def detect_deepfake_resnet(file_path: str, uploaded_file: BinaryIO | None = None, device: str = "cpu"):
     """Entry point for ResNet18-based image/video deepfake detection."""
-    if uploaded_file is not None:
-        upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        temp_path = os.path.join(upload_dir, os.path.basename(file_path) or "upload_tmp.bin")
-
-        with open(temp_path, "wb") as destination:
-            destination.write(uploaded_file.read())
-
-        file_path = temp_path
-
     file_ext = os.path.splitext(file_path)[1].lower()
+    if file_ext not in {".jpg", ".jpeg", ".png", ".mp4", ".avi", ".mov", ".webm"}:
+        raise ValueError(f"Unsupported media type for file: {file_path}")
 
-    if file_ext in {".jpg", ".jpeg", ".png"}:
-        return predict_image_from_path(file_path, device)
-    if file_ext in {".mp4", ".avi", ".mov", ".webm"}:
+    temporary_path = None
+    try:
+        if uploaded_file is not None:
+            with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temporary_file:
+                temporary_file.write(uploaded_file.read())
+                temporary_path = temporary_file.name
+            file_path = temporary_path
+
+        if file_ext in {".jpg", ".jpeg", ".png"}:
+            return predict_image_from_path(file_path, device)
         return predict_video_from_path(file_path, device=device)
-
-    raise ValueError(f"Unsupported media type for file: {file_path}")
+    finally:
+        if temporary_path:
+            os.unlink(temporary_path)

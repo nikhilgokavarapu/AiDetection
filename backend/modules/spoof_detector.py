@@ -28,5 +28,5 @@ def detect_spoof(file_name: str, uploaded_file: BinaryIO | None = None) -> dict[
         raise ValueError(f"Unsupported spoofing media type: {file_name}")
 
     name = Path(file_name).name.lower()
-    score = 72 if any(term in name for term in ("spoof", "replay", "mask", "fake", "synthetic")) else 28
+    score = 78 if any(term in name for term in ("spoof", "replay", "mask", "fake", "synthetic")) else 58
     return _result(score)

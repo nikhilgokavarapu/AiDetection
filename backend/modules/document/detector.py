@@ -122,8 +122,8 @@ def fallback_prediction(file_path):
     """Demo/fallback prediction when model unavailable."""
     filename = str(file_path).lower()
     is_suspicious = any(x in filename for x in ['forged', 'fake', 'tampered', 'spliced'])
-    
-    score = 75 if is_suspicious else 25
+
+    score = 78 if is_suspicious else 32
     label = "fake" if is_suspicious else "real"
     
     return {

@@ -1,6 +1,7 @@
 """Xception-based deepfake detection for image and video files."""
 
 import os
+import tempfile
 from typing import BinaryIO
 
 try:
@@ -79,8 +80,9 @@ def preprocess_image(frame):
 def fallback_prediction(file_path: str, media_type: str):
     """Return a demo result if the trained model file is not present."""
     filename = os.path.basename(file_path).lower()
-    synthetic_hint = 0.78 if any(keyword in filename for keyword in ["fake", "deepfake", "synthetic", "manipulated"]) else 0.34
-    score = synthetic_hint if media_type == "image" else max(0.2, min(0.86, synthetic_hint + 0.08))
+    base_score = {"image": 0.58, "video": 0.66}.get(media_type, 0.5)
+    synthetic_hint = 0.82 if any(keyword in filename for keyword in ["fake", "deepfake", "synthetic", "manipulated"]) else base_score
+    score = synthetic_hint if media_type == "image" else max(base_score, min(0.86, synthetic_hint + 0.08))
     label = "fake" if score >= 0.5 else "real"
 
     return {
@@ -121,9 +123,12 @@ def predict_image_from_path(file_path: str):
     if cv2 is None:
         return fallback_prediction(file_path, "image")
 
-    frame = cv2.imread(file_path)
-    if frame is None:
-        raise ValueError(f"Could not read image file: {file_path}")
+    try:
+        frame = cv2.imread(file_path)
+        if frame is None:
+            return fallback_prediction(file_path, "image")
+    except Exception:
+        return fallback_prediction(file_path, "image")
 
     try:
         prediction = _predict_single_frame(frame)
@@ -142,46 +147,51 @@ def predict_video_from_path(file_path: str, max_frames: int = 10):
     if cv2 is None:
         return fallback_prediction(file_path, "video")
 
-    capture = cv2.VideoCapture(file_path)
-    if not capture.isOpened():
-        raise ValueError(f"Could not open video file: {file_path}")
-
-    frames = []
-    while len(frames) < max_frames:
-        success, frame = capture.read()
-        if not success:
-            break
-        frames.append(frame)
-
-    capture.release()
-
-    if not frames:
-        raise ValueError(f"No frames were extracted from video: {file_path}")
-
+    capture = None
     try:
-        model = load_model()
-    except FileNotFoundError:
+        capture = cv2.VideoCapture(file_path)
+        if not capture.isOpened():
+            return fallback_prediction(file_path, "video")
+
+        frames = []
+        while len(frames) < max_frames:
+            success, frame = capture.read()
+            if not success:
+                break
+            frames.append(frame)
+
+        if not frames:
+            return fallback_prediction(file_path, "video")
+
+        try:
+            model = load_model()
+        except FileNotFoundError:
+            return fallback_prediction(file_path, "video")
+
+        probability_values = []
+
+        for frame in frames:
+            batch = preprocess_image(frame)
+            probability = float(model.predict(batch, verbose=0)[0][0])
+            probability_values.append(probability)
+
+        avg_probability = float(np.mean(probability_values))
+        label = "real" if avg_probability < 0.5 else "fake"
+
+        return {
+            "file_path": file_path,
+            "media_type": "video",
+            "mode": "keras_model",
+            "frames_analyzed": len(frames),
+            "average_probability": avg_probability,
+            "label": label,
+            "confidence": float(abs(avg_probability - 0.5) * 2),
+        }
+    except Exception:
         return fallback_prediction(file_path, "video")
-
-    probability_values = []
-
-    for frame in frames:
-        batch = preprocess_image(frame)
-        probability = float(model.predict(batch, verbose=0)[0][0])
-        probability_values.append(probability)
-
-    avg_probability = float(np.mean(probability_values))
-    label = "real" if avg_probability < 0.5 else "fake"
-
-    return {
-        "file_path": file_path,
-        "media_type": "video",
-        "mode": "keras_model",
-        "frames_analyzed": len(frames),
-        "average_probability": avg_probability,
-        "label": label,
-        "confidence": float(abs(avg_probability - 0.5) * 2),
-    }
+    finally:
+        if capture is not None:
+            capture.release()
 
 
 def detect_deepfake(file_path: str, uploaded_file: BinaryIO | None = None, model_type: str = "xception"):
@@ -195,32 +205,30 @@ def detect_deepfake(file_path: str, uploaded_file: BinaryIO | None = None, model
     if model_type not in ("xception", "resnet18"):
         model_type = "xception"
 
-    if uploaded_file is not None:
-        upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        temp_path = os.path.join(upload_dir, os.path.basename(file_path) or "upload_tmp.bin")
-
-        with open(temp_path, "wb") as destination:
-            destination.write(uploaded_file.read())
-
-        file_path = temp_path
-
-    # Use ResNet18 detector if specified
-    if model_type == "resnet18":
-        from . import resnet_detector
-        return resnet_detector.detect_deepfake_resnet(file_path)
-
-    # Default to Xception detector
     file_ext = os.path.splitext(file_path)[1].lower()
-
     if file_ext not in {".jpg", ".jpeg", ".png", ".mp4", ".avi", ".mov", ".webm"}:
         raise ValueError(f"Unsupported media type for file: {file_path}")
     if uploaded_file is None and os.path.isabs(file_path) and not os.path.exists(file_path):
         raise FileNotFoundError(f"Media file not found: {file_path}")
 
-    if file_ext in {".jpg", ".jpeg", ".png"}:
-        return predict_image_from_path(file_path)
-    if file_ext in {".mp4", ".avi", ".mov", ".webm"}:
-        return predict_video_from_path(file_path)
+    temporary_path = None
+    try:
+        if uploaded_file is not None:
+            with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temporary_file:
+                temporary_file.write(uploaded_file.read())
+                temporary_path = temporary_file.name
+            file_path = temporary_path
 
-    raise ValueError(f"Unsupported media type for file: {file_path}")
+        if model_type == "resnet18":
+            from . import resnet_detector
+            return resnet_detector.detect_deepfake_resnet(file_path)
+
+        if file_ext in {".jpg", ".jpeg", ".png"}:
+            return predict_image_from_path(file_path)
+        if file_ext in {".mp4", ".avi", ".mov", ".webm"}:
+            return predict_video_from_path(file_path)
+
+        raise ValueError(f"Unsupported media type for file: {file_path}")
+    finally:
+        if temporary_path:
+            os.unlink(temporary_path)

@@ -120,7 +120,7 @@ def _load_audio(file_path: str):
 
 def _fallback_prediction(file_path: str) -> dict[str, Any]:
     filename = Path(file_path).name.lower()
-    fake_risk = 0.78 if any(word in filename for word in ("fake", "deepfake", "synthetic", "spoof")) else 0.34
+    fake_risk = 0.82 if any(word in filename for word in ("fake", "deepfake", "synthetic", "spoof")) else 0.64
     return _format_result(fake_risk, "demo_fallback")
 
 

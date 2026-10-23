@@ -8,7 +8,11 @@ Run this script to execute comprehensive tests:
 import sys
 import json
 import traceback
+import tempfile
 from pathlib import Path
+
+import cv2
+import numpy as np
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -19,18 +23,20 @@ def test_detector_fallback():
     
     print("\n✓ Testing fallback prediction mode...")
     
-    # Test Xception fallback
-    result = detect_deepfake("test.jpg", model_type="xception")
-    assert "result" in result, "Xception fallback missing result"
-    assert result["mode"] == "demo_fallback", "Xception should use fallback"
-    assert "label" in result["result"], "Missing label in result"
-    print("  ✓ Xception fallback works")
-    
-    # Test ResNet18 fallback
-    result = detect_deepfake("test.jpg", model_type="resnet18")
-    assert "result" in result, "ResNet18 fallback missing result"
-    assert result["mode"] == "demo_fallback", "ResNet18 should use fallback"
-    print("  ✓ ResNet18 fallback works")
+    with tempfile.TemporaryDirectory() as temp_directory:
+        image_path = Path(temp_directory) / "test.jpg"
+        cv2.imwrite(str(image_path), np.zeros((100, 100, 3), dtype=np.uint8))
+
+        result = detect_deepfake(str(image_path), model_type="xception")
+        assert "result" in result, "Xception fallback missing result"
+        assert result["mode"] == "demo_fallback", "Xception should use fallback"
+        assert "label" in result["result"], "Missing label in result"
+        print("  ✓ Xception fallback works")
+
+        result = detect_deepfake(str(image_path), model_type="resnet18")
+        assert "result" in result, "ResNet18 fallback missing result"
+        assert result["mode"] == "demo_fallback", "ResNet18 should use fallback"
+        print("  ✓ ResNet18 fallback works")
 
 
 def test_detector_image_types():
@@ -77,15 +83,12 @@ def test_unsupported_file_types():
     for ext in unsupported:
         try:
             detect_deepfake(f"test{ext}")
-            print(f"  ✗ {ext} should have been rejected")
-            return False
+            raise AssertionError(f"{ext} should have been rejected")
         except ValueError as e:
             if "Unsupported" in str(e):
                 print(f"  ✓ {ext} correctly rejected")
             else:
                 raise
-    
-    return True
 
 
 def test_api_health_endpoint():

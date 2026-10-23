@@ -57,6 +57,44 @@ class TestAnalyzeEndpoint:
         assert isinstance(result["score"], int)
         assert 0 <= result["score"] <= 100
 
+    def test_video_analysis_uses_average_probability(self, client, monkeypatch):
+        """Verify video detector probabilities are normalized into the API result."""
+        monkeypatch.setattr(
+            "app.detect_deepfake",
+            lambda *_args, **_kwargs: {
+                "media_type": "video",
+                "mode": "keras_model",
+                "average_probability": 0.73,
+                "label": "fake",
+                "confidence": 0.46,
+            },
+        )
+
+        response = client.post(
+            "/api/analyze",
+            data={"modality": "video"},
+            files={"file": ("clip.mp4", b"video", "video/mp4")},
+        )
+
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["score"] == 73
+        assert result["mode"] == "keras_model"
+
+    def test_uploaded_media_is_not_persisted(self, client):
+        """Verify uploaded detector inputs are removed after analysis."""
+        uploads_directory = Path(__file__).parent / "uploads"
+        files_before = set(uploads_directory.iterdir())
+
+        response = client.post(
+            "/api/analyze",
+            data={"modality": "image"},
+            files={"file": ("temporary-upload.jpg", b"not-an-image", "image/jpeg")},
+        )
+
+        assert response.status_code == 200
+        assert set(uploads_directory.iterdir()) == files_before
+
     def test_analyze_with_empty_text_fails(self, client):
         """Verify empty text input raises error."""
         response = client.post(
@@ -120,6 +158,38 @@ class TestAnalyzeEndpoint:
         )
         assert response.status_code == 400
         assert "No file or text provided" in response.json()["detail"]
+
+    def test_analyze_modalities_do_not_all_share_same_score(self, client):
+        """Generic fallback results should be distinct by modality instead of flattening to one value."""
+        responses = [
+            client.post(
+                "/api/analyze",
+                data={"modality": "text", "text": "This is a normal article with balanced sentence structure."},
+            ),
+            client.post(
+                "/api/analyze",
+                data={"modality": "image"},
+                files={"file": ("generic.jpg", b"not-a-real-image", "image/jpeg")},
+            ),
+            client.post(
+                "/api/analyze",
+                data={"modality": "video"},
+                files={"file": ("generic.mp4", b"not-a-real-video", "video/mp4")},
+            ),
+            client.post(
+                "/api/analyze",
+                data={"modality": "audio"},
+                files={"file": ("generic.wav", b"not-a-real-audio", "audio/wav")},
+            ),
+            client.post(
+                "/api/analyze",
+                data={"modality": "spoof"},
+                files={"file": ("generic.mp4", b"not-a-real-video", "video/mp4")},
+            ),
+        ]
+
+        scores = [response.json()["result"]["score"] for response in responses]
+        assert len(set(scores)) > 1
 
     def test_analyze_with_different_modalities(self, client):
         """Test analyze with different modality values."""
@@ -231,10 +301,11 @@ class TestCORSHeaders:
     """Test CORS middleware configuration."""
 
     def test_cors_headers_present(self, client):
-        """Verify CORS headers are included in responses."""
-        response = client.get("/health")
-        # TestClient includes CORS headers by default
+        """Verify local frontend origins receive explicit CORS permission."""
+        response = client.get("/health", headers={"Origin": "http://localhost:5173"})
+
         assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
 class TestErrorHandling:
